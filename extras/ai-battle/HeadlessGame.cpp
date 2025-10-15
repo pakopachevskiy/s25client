@@ -7,7 +7,11 @@
 #include "GlobalGameSettings.h"
 #include "PlayerInfo.h"
 #include "Savegame.h"
+#include "ai/aijh/AIConfig.h"
+#include "ai/aijh/StatsConfig.h"
 #include "factories/AIFactory.h"
+#include "helpers/format.hpp"
+#include "helpers/random.h"
 #include "network/PlayerGameCommands.h"
 #include "world/GameWorld.h"
 #include "world/MapLoader.h"
@@ -16,6 +20,7 @@
 #include <boost/nowide/iostream.hpp>
 #include <chrono>
 #include <cstdio>
+#include <iomanip>
 #include <sstream>
 #ifdef WIN32
 #    include "Windows.h"
@@ -109,8 +114,21 @@ void HeadlessGame::Run(unsigned maxGF)
             nextReport += std::chrono::seconds(1);
             PrintState();
         }
+        auto currentGF = em_.GetCurrentGF();
+        if(STATS_CONFIG.save_period>0 && (currentGF == 1 || currentGF % STATS_CONFIG.save_period == 0))
+        {
+            boost::format fmt("%s/ai_run_%s.sav");
+            fmt % STATS_CONFIG.savesPath % toPaddedString(currentGF, 8);
+            SaveGame(fmt.str());
+        }
     }
     PrintState();
+}
+
+std::string HeadlessGame::toPaddedString(unsigned int value, int width) {
+    std::ostringstream oss;
+    oss << std::setw(width) << std::setfill('0') << value;
+    return oss.str();
 }
 
 void HeadlessGame::Close()
@@ -183,6 +201,7 @@ std::string HumanReadableNumber(unsigned num)
 
 void HeadlessGame::PrintState()
 {
+    bnw::cout << "frame:" << em_.GetCurrentGF() << '\n';
     static bool first_run = true;
     if(first_run)
         first_run = false;
@@ -198,20 +217,21 @@ void HeadlessGame::PrintState()
       HumanReadableNumber(em_.GetCurrentGF() - lastReportGf_).c_str()); // GF per second
     printConsole("└───────────────┴───────────────────────┴───────────────────────┴────────────────┘\n");
     printConsole("\n");
-    printConsole("┌────────────────────────┬─────────────────┬─────────────┬───────────┬───────────┐\n");
-    printConsole("│ Player                 │ Country         │ Buildings   │ Military  │ Gold      │\n");
-    printConsole("├────────────────────────┼─────────────────┼─────────────┼───────────┼───────────┤\n");
+    printConsole("┌────────────────────────┬─────────────────┬─────────────┬───────────┬───────────┬───────────┐\n");
+    printConsole("│ Player                 │ Country         │ Buildings   │ Military  │ Gold      │ Kills     │\n");
+    printConsole("├────────────────────────┼─────────────────┼─────────────┼───────────┼───────────┼───────────┤\n");
     for(unsigned playerId = 0; playerId < world_.GetNumPlayers(); ++playerId)
     {
         const GamePlayer& player = world_.GetPlayer(playerId);
-        printConsole("│ %s%-22s%s │ %15s │ %11s │ %9s │ %9s │\n", player.IsDefeated() ? "\x1b[9m" : "",
+        printConsole("│ %s%-22s%s │ %15s │ %11s │ %9s │ %9s │ %9s │\n", player.IsDefeated() ? "\x1b[9m" : "",
                      player.name.c_str(), player.IsDefeated() ? "\x1b[29m" : "",
                      HumanReadableNumber(player.GetStatisticCurrentValue(StatisticType::Country)).c_str(),
                      HumanReadableNumber(player.GetStatisticCurrentValue(StatisticType::Buildings)).c_str(),
                      HumanReadableNumber(player.GetStatisticCurrentValue(StatisticType::Military)).c_str(),
-                     HumanReadableNumber(player.GetStatisticCurrentValue(StatisticType::Gold)).c_str());
+                     HumanReadableNumber(player.GetStatisticCurrentValue(StatisticType::Gold)).c_str(),
+                     HumanReadableNumber(player.GetStatisticCurrentValue(StatisticType::Vanquished)).c_str());
     }
-    printConsole("└────────────────────────┴─────────────────┴─────────────┴───────────┴───────────┘\n");
+    printConsole("└────────────────────────┴─────────────────┴─────────────┴───────────┴───────────┴───────────┘\n");
 
     lastReportGf_ = em_.GetCurrentGF();
 }
@@ -219,23 +239,34 @@ void HeadlessGame::PrintState()
 std::vector<PlayerInfo> GeneratePlayerInfo(const std::vector<AI::Info>& ais)
 {
     std::vector<PlayerInfo> ret;
+    PlayerInfo pi;
+
     for(const AI::Info& ai : ais)
     {
         PlayerInfo pi;
-        pi.ps = PlayerState::Occupied;
         pi.aiInfo = ai;
+        if(ai.type == AI::Type::None)
+        {
+            pi.ps = PlayerState::Locked;
+        } else
+        {
+            pi.ps = PlayerState::Occupied;
+        }
         switch(ai.type)
         {
+            case AI::Type::None: pi.name = "None"; break;
             case AI::Type::Default: pi.name = "AIJH " + std::to_string(ret.size()); break;
             case AI::Type::Dummy:
             default: pi.name = "Dummy " + std::to_string(ret.size()); break;
         }
-        pi.nation = Nation::Romans;
+        static std::random_device rd;
+        pi.nation = ai_random::randomEnum<Nation>();
         pi.team = Team::None;
         ret.push_back(pi);
     }
     return ret;
 }
+
 
 #ifdef WIN32
 HANDLE setupStdOut()

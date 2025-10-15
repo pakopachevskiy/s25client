@@ -6,9 +6,9 @@
 #include "RttrForeachPt.h"
 #include "ai/AIInterface.h"
 #include "ai/aijh/AIMap.h"
-#include "buildings/noBuildingSite.h"
-#include "buildings/nobUsual.h"
 #include "gameData/TerrainDesc.h"
+
+#include <boost/concept/detail/has_constraints.hpp>
 
 namespace AIJH {
 
@@ -74,15 +74,90 @@ void AIResourceMap::updateAround(const MapPoint& pt, int radius)
         updateAroundReplinishable(pt, radius);
 }
 
-MapPoint AIResourceMap::findBestPosition(const MapPoint& pt, BuildingQuality size, unsigned radius, int minimum) const
+unsigned AIResourceMap::calcResources() const
 {
-    MapPoint best = MapPoint::Invalid();
-    int best_value = (minimum == std::numeric_limits<int>::min()) ? minimum : minimum - 1;
+    unsigned sum = 0;
+    for(unsigned i = 0; i < aiMap.Size(); i++)
+    {
+        auto node = aiMap[i];
+        if(node.reachable && node.owned && !node.farmed)
+        {
+            sum += map[i];
+        }
+    }
+    return sum;
+}
+unsigned AIResourceMap::calcResources(const MapPoint& pt, unsigned radius) const
+{
+    unsigned sum = 0;
+    std::vector<MapPoint> pts = aii.gwb.GetPointsInRadiusWithCenter(pt, radius);
+    for(const MapPoint& curPt : pts)
+    {
+        if(pt.x < map.GetSize().x && pt.y < map.GetSize().y)
+        {
+            const unsigned idx = map.GetIdx(curPt);
+            if(!aiMap[idx].reachable || !aiMap[idx].owned || aiMap[idx].farmed)
+                continue;
+            sum += map[idx];
+        }
+    }
 
+    return sum;
+}
+int AIResourceMap::getResourcesAt(const MapPoint& pt) const
+{
+    const unsigned idx = map.GetIdx(pt);
+    return map[idx];
+}
+
+RatedPointSet AIResourceMap::findBestPositions(const MapPoint& pt, BuildingQuality size, unsigned radius,
+                                                         int minimum, int maxCount) const
+{
+    int min_value = (minimum == std::numeric_limits<int>::min()) ? minimum : minimum - 1;
+    RatedPointSet topSet(maxCount);
     std::vector<MapPoint> pts = aii.gwb.GetPointsInRadiusWithCenter(pt, radius);
     for(const MapPoint& curPt : pts)
     {
         const unsigned idx = map.GetIdx(curPt);
+
+        if(map[idx] > min_value)
+        {
+            if(!aiMap[idx].reachable || !aiMap[idx].owned || aiMap[idx].farmed)
+                continue;
+            RTTR_Assert(aii.GetBuildingQuality(curPt)
+                        == aiMap[curPt].bq); // Temporary, to check if aiMap is correctly update, see below
+            if(!canUseBq(aii.GetBuildingQuality(curPt), size)) // map[idx].bq; TODO: Update nodes BQ and use that
+                continue;
+            // special case fish -> check for other fishery buildings
+            if(res == AIResource::Fish && aii.isBuildingNearby(BuildingType::Fishery, curPt, 5))
+                continue;
+            if(res == AIResource::Borderland
+               && (aii.gwb.IsOnRoad(aii.gwb.GetNeighbour(curPt, Direction::SouthEast))
+                   || aii.gwb.IsInsideComputerBarrier(curPt)))
+                continue;
+            // dont build next to empty harborspots
+            if(aii.isHarborPosClose(curPt, 2, true))
+                continue;
+            auto worst = topSet.insert({curPt, map[idx]});
+            if(worst)
+            {
+                min_value = worst.value().rating;
+            }
+        }
+    }
+    return topSet;
+}
+
+std::pair<MapPoint, int> AIResourceMap::findBestPosition(const MapPoint& pt, BuildingQuality size, unsigned radius,
+                                                         int minimum) const
+{
+    MapPoint best = MapPoint::Invalid();
+    int best_value = (minimum == std::numeric_limits<int>::min()) ? minimum : minimum - 1;
+    std::vector<MapPoint> pts = aii.gwb.GetPointsInRadiusWithCenter(pt, radius);
+    for(const MapPoint& curPt : pts)
+    {
+        const unsigned idx = map.GetIdx(curPt);
+
         if(map[idx] > best_value)
         {
             if(!aiMap[idx].reachable || !aiMap[idx].owned || aiMap[idx].farmed)
@@ -106,8 +181,7 @@ MapPoint AIResourceMap::findBestPosition(const MapPoint& pt, BuildingQuality siz
             // TODO: calculate "perfect" rating and instantly return if we got that already
         }
     }
-
-    return best;
+    return {best, best_value};
 }
 
 void AIResourceMap::avoidPosition(const MapPoint& pt)
@@ -203,5 +277,4 @@ void AIResourceMap::updateAroundReplinishable(const MapPoint& pt, const int radi
         }
     }
 }
-
 } // namespace AIJH

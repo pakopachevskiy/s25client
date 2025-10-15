@@ -43,12 +43,23 @@ source_group(other FILES ${SOURCES_OTHER})
 set(s25Main_SRCS
     ${SOURCES_OTHER}
     ${SOURCES_SUBDIRS}
+        ai/aijh/BuildingCalculator.cpp
+        ai/aijh/AIConfig.cpp
+        ai/aijh/AIConfig.h
+        ai/aijh/PlannerHelper.cpp
+        ai/aijh/PlannerHelper.h
+        ai/aijh/PositionFinder.cpp
+        ai/aijh/PositionFinder.h
+        ai/RatedPoint.h
+        ai/aijh/WeightParser.h
+        ai/aijh/WeightParams.h
 )
 
 add_library(s25Main STATIC ${s25Main_SRCS})
 target_include_directories(s25Main PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(s25Main PROPERTIES CXX_EXTENSIONS OFF)
 target_compile_features(s25Main PUBLIC cxx_std_17)
+find_package(yaml-cpp REQUIRED)
 
 target_link_libraries(s25Main PUBLIC
     siedler2
@@ -61,8 +72,9 @@ target_link_libraries(s25Main PUBLIC
     gamedata
     glad
     driver
+    yaml-cpp
     Boost::filesystem Boost::disable_autolinking
-    PRIVATE BZip2::BZip2 Boost::iostreams Boost::locale Boost::nowide samplerate_cpp
+    PRIVATE BZip2::BZip2 Boost::iostreams Boost::locale Boost::nowide samplerate_cpp yaml-cpp
 )
 
 if(WIN32)

@@ -1,15 +1,17 @@
-// Copyright (C) 2005 - 2024 Settlers Freaks (sf-team at siedler25.org)
-//
-// SPDX-License-Identifier: GPL-2.0-or-later
-
 #include "GlobalGameSettings.h"
 #include "HeadlessGame.h"
 #include "QuickStartGame.h"
 #include "RTTR_Version.h"
 #include "RttrConfig.h"
+#include "addons/Addon.h"
+#include "ai/aijh/AIConfig.h"
+#include "ai/aijh/StatsConfig.h"
 #include "files.h"
 #include "random/Random.h"
+
+#include "s25util/Log.h"
 #include "s25util/System.h"
+#include <yaml-cpp/yaml.h>
 
 #include <boost/filesystem.hpp>
 #include <boost/nowide/args.hpp>
@@ -17,6 +19,7 @@
 #include <boost/nowide/iostream.hpp>
 #include <boost/optional.hpp>
 #include <boost/program_options.hpp>
+#include <filesystem>
 
 namespace bnw = boost::nowide;
 namespace bfs = boost::filesystem;
@@ -28,23 +31,32 @@ int main(int argc, char** argv)
     bnw::args _(argc, argv);
 
     boost::optional<std::string> replay_path;
-    boost::optional<std::string> savegame_path;
+    boost::optional<std::string> output_path;
+    boost::optional<std::string> runId;
+    boost::optional<std::string> profileId;
+    boost::optional<std::string> runSetId;
+    boost::optional<unsigned int> statsPeriod;
+    boost::optional<unsigned int> savePeriod;
+    boost::optional<unsigned int> debugStatsPeriod;
     unsigned random_init = static_cast<unsigned>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
     po::options_description desc("Allowed options");
-    // clang-format off
     desc.add_options()
         ("help,h", "Show help")
+        ("max_gf", po::value<unsigned>()->default_value(std::numeric_limits<unsigned>::max()),"Maximum number of game frames to run (optional)")
+        ("output_path", po::value(&output_path),"Filename to write savegame to (optional)")
+        ("stats_period", po::value(&statsPeriod),"Stats period")
+        ("save_period", po::value(&savePeriod),"Save period")
+        ("debug_stats_period", po::value(&savePeriod),"Save period")
         ("map,m", po::value<std::string>()->required(),"Map to load")
         ("ai", po::value<std::vector<std::string>>()->required(),"AI player(s) to add")
-        ("objective", po::value<std::string>()->default_value("domination"),"domination(default)|conquer")
-        ("replay", po::value(&replay_path),"Filename to write replay to (optional)")
-        ("save", po::value(&savegame_path),"Filename to write savegame to (optional)")
+        ("objective", po::value<std::string>()->default_value("none"),"none(default)|domination|conquer")
+        ("weights_file", po::value<std::string>()->required(), "AI weights file")
+        ("start_wares", po::value<std::string>()->default_value("alot"),"Start wares")
+        ("replay", po::value(&replay_path),"Filename to write stats_interval to (optional)")
         ("random_init", po::value(&random_init),"Seed value for the random number generator (optional)")
-        ("maxGF", po::value<unsigned>()->default_value(std::numeric_limits<unsigned>::max()),"Maximum number of game frames to run (optional)")
         ("version", "Show version information and exit")
         ;
-    // clang-format on
 
     if(argc == 1)
     {
@@ -80,7 +92,18 @@ int main(int argc, char** argv)
 
     try
     {
-        // We print arguments and seed in order to be able to reproduce crashes.
+        STATS_CONFIG.outputPath = *output_path;
+        std::string statsDir = *output_path + "/stats/";
+        bfs::create_directory(statsDir);
+        STATS_CONFIG.statsPath = statsDir;
+        std::string savesDir = *output_path + "/saves/";
+        bfs::create_directory(savesDir);
+        STATS_CONFIG.savesPath = savesDir;
+
+        std::string logsDir = *output_path + "/logs/";
+        bfs::create_directory(logsDir);
+        LOG.setLogFilepath(logsDir);
+
         for(int i = 0; i < argc; ++i)
             bnw::cout << argv[i] << " ";
         bnw::cout << std::endl;
@@ -93,27 +116,51 @@ int main(int argc, char** argv)
         const bfs::path mapPath = RTTRCONFIG.ExpandPath(options["map"].as<std::string>());
         const std::vector<AI::Info> ais = ParseAIOptions(options["ai"].as<std::vector<std::string>>());
 
+        const auto weightsFile = options["weights_file"].as<std::string>();
+        applyWeightsCfg(weightsFile);
+
         GlobalGameSettings ggs;
         const auto objective = options["objective"].as<std::string>();
         if(objective == "domination")
             ggs.objective = GameObjective::TotalDomination;
         else if(objective == "conquer")
             ggs.objective = GameObjective::Conquer3_4;
+        else if(objective == "none")
+            ggs.objective = GameObjective::None;
         else
         {
             bnw::cerr << "unknown objective: " << objective << std::endl;
             return 1;
         }
 
-        ggs.objective = GameObjective::TotalDomination;
+        const auto startWares = options["start_wares"].as<std::string>();
+        if(startWares == "low")
+            ggs.startWares = StartWares::Low;
+        else if(startWares == "vlow")
+            ggs.startWares = StartWares::VLow;
+        else if(startWares == "normal")
+            ggs.startWares = StartWares::Normal;
+        else if(startWares == "alot")
+            ggs.startWares = StartWares::ALot;
+        else
+        {
+            bnw::cerr << "unknown start wares: " << startWares << std::endl;
+            return 1;
+        }
+
+        STATS_CONFIG.stats_period = statsPeriod.get_value_or(0);
+        STATS_CONFIG.save_period = savePeriod.get_value_or(0);
+
+        ggs.setSelection(AddonId::INEXHAUSTIBLE_MINES, 1);
+        ggs.setSelection(AddonId::CHANGE_GOLD_DEPOSITS, 4);
         HeadlessGame game(ggs, mapPath, ais);
         if(replay_path)
             game.RecordReplay(*replay_path, random_init);
 
-        game.Run(options["maxGF"].as<unsigned>());
+
+        game.Run(options["max_gf"].as<unsigned>());
         game.Close();
-        if(savegame_path)
-            game.SaveGame(*savegame_path);
+
     } catch(const std::exception& e)
     {
         bnw::cerr << e.what() << std::endl;

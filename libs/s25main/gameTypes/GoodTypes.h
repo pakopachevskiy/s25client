@@ -7,6 +7,7 @@
 #include "helpers/MaxEnumValue.h"
 #include "mygettext/mygettext.h"
 #include <cstdint>
+#include <map>
 #include <string>
 
 // Warentypen
@@ -83,3 +84,87 @@ constexpr unsigned WARE_STACK_TEX_MAP_OFFSET = 2200;
 constexpr unsigned WARES_TEX_MAP_OFFSET = 2250;
 /// Offset into the map image archive to get the ware texture when carried by a donkey
 constexpr unsigned WARES_DONKEY_TEX_MAP_OFFSET = 2350;
+
+const std::map<Tool, std::string> TOOL_NAMES_1 = {
+  {Tool::Tongs, "Tongs"},       {Tool::Hammer, "Hammer"},         {Tool::Axe, "Axe"},
+  {Tool::Saw, "Saw"},           {Tool::PickAxe, "PickAxe"},       {Tool::Shovel, "Shovel"},
+  {Tool::Crucible, "Crucible"}, {Tool::RodAndLine, "RodAndLine"}, {Tool::Scythe, "Scythe"},
+  {Tool::Cleaver, "Cleaver"},   {Tool::Rollingpin, "Rollingpin"}, {Tool::Bow, "Bow"}};
+
+const std::map<std::string, GoodType> GOOD_NAMES_MAP = {{"Beer", GoodType::Beer},
+                                                        {"Tongs", GoodType::Tongs},
+                                                        {"Hammer", GoodType::Hammer},
+                                                        {"Axe", GoodType::Axe},
+                                                        {"Saw", GoodType::Saw},
+                                                        {"PickAxe", GoodType::PickAxe},
+                                                        {"Shovel", GoodType::Shovel},
+                                                        {"Crucible", GoodType::Crucible},
+                                                        {"RodAndLine", GoodType::RodAndLine},
+                                                        {"Scythe", GoodType::Scythe},
+                                                        {"WaterEmpty", GoodType::WaterEmpty},
+                                                        {"Water", GoodType::Water},
+                                                        {"Cleaver", GoodType::Cleaver},
+                                                        {"Rollingpin", GoodType::Rollingpin},
+                                                        {"Bow", GoodType::Bow},
+                                                        {"Boat", GoodType::Boat},
+                                                        {"Sword", GoodType::Sword},
+                                                        {"Iron", GoodType::Iron},
+                                                        {"Flour", GoodType::Flour},
+                                                        {"Fish", GoodType::Fish},
+                                                        {"Bread", GoodType::Bread},
+                                                        {"ShieldRomans", GoodType::ShieldRomans},
+                                                        {"Wood", GoodType::Wood},
+                                                        {"Boards", GoodType::Boards},
+                                                        {"Stones", GoodType::Stones},
+                                                        {"ShieldVikings", GoodType::ShieldVikings},
+                                                        {"ShieldAfricans", GoodType::ShieldAfricans},
+                                                        {"Grain", GoodType::Grain},
+                                                        {"Coins", GoodType::Coins},
+                                                        {"Gold", GoodType::Gold},
+                                                        {"IronOre", GoodType::IronOre},
+                                                        {"Coal", GoodType::Coal},
+                                                        {"Meat", GoodType::Meat},
+                                                        {"Ham", GoodType::Ham},
+                                                        {"ShieldJapanese", GoodType::ShieldJapanese},
+                                                        {"Grapes", GoodType::Grapes},
+                                                        {"Wine", GoodType::Wine},
+                                                        {"Nothing", GoodType::Nothing}};
+
+const std::map<GoodType, std::string> GOOD_NAMES_1 = {{GoodType::Beer, "Beer"},
+                                                      {GoodType::Tongs, "Tongs"},
+                                                      {GoodType::Hammer, "Hammer"},
+                                                      {GoodType::Axe, "Axe"},
+                                                      {GoodType::Saw, "Saw"},
+                                                      {GoodType::PickAxe, "PickAxe"},
+                                                      {GoodType::Shovel, "Shovel"},
+                                                      {GoodType::Crucible, "Crucible"},
+                                                      {GoodType::RodAndLine, "RodAndLine"},
+                                                      {GoodType::Scythe, "Scythe"},
+                                                      {GoodType::WaterEmpty, "WaterEmpty"},
+                                                      {GoodType::Water, "Water"},
+                                                      {GoodType::Cleaver, "Cleaver"},
+                                                      {GoodType::Rollingpin, "Rollingpin"},
+                                                      {GoodType::Bow, "Bow"},
+                                                      {GoodType::Boat, "Boat"},
+                                                      {GoodType::Sword, "Sword"},
+                                                      {GoodType::Iron, "Iron"},
+                                                      {GoodType::Flour, "Flour"},
+                                                      {GoodType::Fish, "Fish"},
+                                                      {GoodType::Bread, "Bread"},
+                                                      {GoodType::ShieldRomans, "ShieldRomans"},
+                                                      {GoodType::Wood, "Wood"},
+                                                      {GoodType::Boards, "Boards"},
+                                                      {GoodType::Stones, "Stones"},
+                                                      {GoodType::ShieldVikings, "ShieldVikings"},
+                                                      {GoodType::ShieldAfricans, "ShieldAfricans"},
+                                                      {GoodType::Grain, "Grain"},
+                                                      {GoodType::Coins, "Coins"},
+                                                      {GoodType::Gold, "Gold"},
+                                                      {GoodType::IronOre, "IronOre"},
+                                                      {GoodType::Coal, "Coal"},
+                                                      {GoodType::Meat, "Meat"},
+                                                      {GoodType::Ham, "Ham"},
+                                                      {GoodType::ShieldJapanese, "ShieldJapanese"},
+                                                      {GoodType::Grapes, "Grapes"},
+                                                      {GoodType::Wine, "Wine"},
+                                                      {GoodType::Nothing, "Nothing"}};

@@ -4,13 +4,13 @@
 
 #pragma once
 
+#include "PositionFinder.h"
 #include "ai/AIEventManager.h"
 #include "ai/AIPlayer.h"
 #include "ai/aijh/AIMap.h"
 #include "ai/aijh/AIResourceMap.h"
 #include "helpers/OptionalEnum.h"
 #include "gameTypes/MapCoordinates.h"
-#include <boost/container/static_vector.hpp>
 #include <list>
 #include <memory>
 #include <queue>
@@ -23,6 +23,7 @@ class Base;
 }
 
 namespace AIJH {
+class PositionFinder;
 class BuildingPlanner;
 class AIConstruction;
 class AIJob;
@@ -56,6 +57,7 @@ public:
     /// return value is whatever has to be added to 4(=50%) for harbor and if anything is left that has to be added to 1
     /// bar setting
     unsigned CalcMilSettings();
+    void saveStats(unsigned gf) const;
     /// military & tool production settings
     void AdjustSettings();
     /// return number of seaIds with at least 2 harbor spots
@@ -92,9 +94,11 @@ public:
     /// If searchPosition is true, then the point is searched for a good position (around that pt) otherwise the point
     /// is taken
     void AddBuildJob(BuildingType type, MapPoint pt, bool front = false, bool searchPosition = true);
+    void AddGlobalBuildJob(BuildingType type);
     /// Build a new military building at that position
     void AddMilitaryBuildJob(MapPoint pt);
     /// adds buildjobs for a buildingtype around every warehouse or military building
+    MapPoint FindBestPosition(BuildingType bt);
     void AddBuildJobAroundEveryWarehouse(BuildingType bt);
     void AddBuildJobAroundEveryMilBld(BuildingType bt);
     /// blocks goods in each warehouse that has at least limit amount of that good - if all warehouses have enough they
@@ -108,6 +112,7 @@ public:
     /// returns the warehouse closest to the upgradebuilding or if it cant find a way the first warehouse and if there
     /// is no warehouse left null
     nobBaseWarehouse* GetUpgradeBuildingWarehouse();
+    void SetSendingForUpgradeWarehouse(nobBaseWarehouse* upgradewarehouse);
     /// activate gathering of swords,shields,beer,privates(if there is an upgrade building), helpers(if necessary)
     void SetGatheringForUpgradeWarehouse(nobBaseWarehouse* upgradewarehouse);
     /// Initializes the nodes on start of the game
@@ -135,6 +140,8 @@ public:
     MapPoint SimpleFindPosition(const MapPoint& pt, BuildingQuality size, unsigned radius) const;
     /// Find a position for a specific building around a given point
     MapPoint FindPositionForBuildingAround(BuildingType type, const MapPoint& around);
+
+    unsigned GetAvailableResources (AISurfaceResource resource) const;
     /// Density in percent (0-100)
     unsigned GetDensity(MapPoint pt, AIResource res, int radius);
     /// Does some actions after a new military building is occupied
@@ -215,6 +222,8 @@ public:
 
     MapPoint UpgradeBldPos;
 
+    unsigned GetProductivity(BuildingType type) const;
+
 private:
     /// The current job the AI is working on
     std::unique_ptr<AIJob> currentJob;
@@ -235,9 +244,9 @@ private:
     AIEventManager eventManager;
     std::unique_ptr<BuildingPlanner> bldPlanner;
     std::unique_ptr<AIConstruction> construction;
+    std::unique_ptr<PositionFinder> positionFinder;
 
     Subscription subBuilding, subExpedition, subResource, subRoad, subShip, subBQ;
     std::vector<MapPoint> nodesWithOutdatedBQ;
 };
-
 } // namespace AIJH

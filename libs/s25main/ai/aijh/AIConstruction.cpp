@@ -24,6 +24,8 @@
 #include "gameTypes/Inventory.h"
 #include "gameTypes/JobTypes.h"
 #include "gameData/BuildingProperties.h"
+
+#include "s25util/Log.h"
 #include "s25util/warningSuppression.h"
 #include <boost/range/adaptor/reversed.hpp>
 #include <algorithm>
@@ -42,12 +44,34 @@ AIConstruction::AIConstruction(AIPlayerJH& aijh)
 
 AIConstruction::~AIConstruction() = default;
 
+void AIConstruction::AddGlobalBuildJob(std::unique_ptr<BuildJob> job)
+{
+    BuildingType jobType = job->GetType();
+    bool alreadyinlist = false;
+    for(auto& buildJob : globalBuildJobs)
+    {
+        if(buildJob.GetType() == jobType)
+        {
+            alreadyinlist = true;
+            break;
+        }
+    }
+    if(!alreadyinlist)
+    {
+        globalBuildJobs.emplace(std::move(*job));
+    }
+}
+
 void AIConstruction::AddBuildJob(std::unique_ptr<BuildJob> job, bool front)
 {
-    if(job->GetType() == BuildingType::Shipyard && aijh.IsInvalidShipyardPosition(job->GetAround()))
+    BuildingType jobType = job->GetType();
+    // MapPoint around = job->GetAround();
+    // std::string name = BUILDING_NAMES_1.at(jobType);
+    // LOG.write("AddBuildJob %s at %d,%d\n") % name % around.x % around.y;
+    if(jobType == BuildingType::Shipyard && aijh.IsInvalidShipyardPosition(job->GetAround()))
         return;
     if(BuildingProperties::IsMilitary(
-         job->GetType())) // non military buildings can only be added once to the contruction que for every location
+         jobType)) // non military buildings can only be added once to the contruction que for every location
     {
         if(front)
             buildJobs.push_front(std::move(job));
@@ -58,7 +82,7 @@ void AIConstruction::AddBuildJob(std::unique_ptr<BuildJob> job, bool front)
         bool alreadyinlist = false;
         for(auto& buildJob : buildJobs)
         {
-            if(buildJob->GetType() == job->GetType() && buildJob->GetAround() == job->GetAround())
+            if(buildJob->GetType() == jobType && buildJob->GetAround() == job->GetAround())
             {
                 alreadyinlist = true;
                 break;
@@ -88,8 +112,9 @@ void AIConstruction::ExecuteJobs(unsigned limit)
     unsigned i = 0; // count up to limit
     unsigned initconjobs = std::min<unsigned>(connectJobs.size(), 5);
     unsigned initbuildjobs = std::min<unsigned>(buildJobs.size(), 5);
-    for(; i < limit && !connectJobs.empty() && i < initconjobs;
-        i++) // go through list, until limit is reached or list empty or when every entry has been checked
+    // go through list, until limit is reached or list empty or when every entry has been checked
+
+    for(; i < limit && !connectJobs.empty() && i < initconjobs; i++)
     {
         auto job = std::move(connectJobs.front());
         connectJobs.pop_front();
@@ -100,12 +125,30 @@ void AIConstruction::ExecuteJobs(unsigned limit)
             connectJobs.push_back(std::move(job));
         }
     }
+
+    std::vector<BuildJob> unfinishedJobs;
+    for(; i < limit && !globalBuildJobs.empty() && i < (initconjobs + initbuildjobs); i++)
+    {
+        auto job = PopGlobalBuildJob();
+        job->ExecuteJob();
+        // couldnt do job? -> move to back of list
+        if(job->GetState() != JobState::Finished && job->GetState() != JobState::Failed)
+        {
+            job->priority--;
+            globalBuildJobs.emplace(std::move(*job));
+        }
+    }
+    for (auto& job : unfinishedJobs)
+    {
+        globalBuildJobs.emplace(std::move(job));
+    }
+
     for(; i < limit && !buildJobs.empty() && i < (initconjobs + initbuildjobs); i++)
     {
         auto job = GetBuildJob();
         job->ExecuteJob();
-        if(job->GetState() != JobState::Finished
-           && job->GetState() != JobState::Failed) // couldnt do job? -> move to back of list
+        // couldnt do job? -> move to back of list
+        if(job->GetState() != JobState::Finished && job->GetState() != JobState::Failed)
         {
             buildJobs.push_back(std::move(job));
         }
@@ -128,6 +171,17 @@ void AIConstruction::SetFlagsAlongRoad(const noRoadNode& roadNode, Direction dir
         aii.SetFlag(curPos);
         constructionlocations.push_back(curPos);
     }
+}
+
+std::unique_ptr<BuildJob> AIConstruction::PopGlobalBuildJob()
+{
+    if(globalBuildJobs.empty())
+        return nullptr;
+
+    auto iter = globalBuildJobs.begin();
+    BuildJob topJob = *iter;
+    globalBuildJobs.erase(iter);
+    return std::make_unique<BuildJob>(std::move(topJob));
 }
 
 std::unique_ptr<BuildJob> AIConstruction::GetBuildJob()
@@ -254,12 +308,12 @@ bool AIConstruction::ConnectFlagToRoadSytem(const noFlag* flag, std::vector<Dire
     // const unsigned short maxSearchRadius = 10;
 
     // flag of a military building? -> check if we really want to connect this right now
-    const MapPoint bldPos = aii.gwb.GetNeighbour(flag->GetPos(), Direction::NorthWest);
-    if(const auto* milBld = aii.gwb.GetSpecObj<const nobMilitary>(bldPos))
-    {
-        if(!MilitaryBuildingWantsRoad(*milBld))
-            return false;
-    }
+    // const MapPoint bldPos = aii.gwb.GetNeighbour(flag->GetPos(), Direction::NorthWest);
+    // if(const auto* milBld = aii.gwb.GetSpecObj<const nobMilitary>(bldPos))
+    // {
+    //     if(!MilitaryBuildingWantsRoad(*milBld))
+    //         return false;
+    // }
     // Ziel, das möglichst schnell erreichbar sein soll
     // noFlag *targetFlag = gwb->GetSpecObj<nobHQ>(player->hqPos)->GetFlag();
     noFlag* targetFlag = FindTargetStoreHouseFlag(flag->GetPos());
@@ -285,8 +339,8 @@ bool AIConstruction::ConnectFlagToRoadSytem(const noFlag* flag, std::vector<Dire
         tmpRoute.clear();
         unsigned length;
         // the flag should not be at a military building!
-        if(aii.gwb.IsMilitaryBuildingOnNode(aii.gwb.GetNeighbour(curFlag->GetPos(), Direction::NorthWest), true))
-            continue;
+        // if(aii.gwb.IsMilitaryBuildingOnNode(aii.gwb.GetNeighbour(curFlag->GetPos(), Direction::NorthWest), true))
+        //     continue;
         // Gibts überhaupt einen Pfad zu dieser Flagge
         if(!aii.FindFreePathForNewRoad(flag->GetPos(), curFlag->GetPos(), &tmpRoute, &length))
             continue;
@@ -326,9 +380,10 @@ bool AIConstruction::ConnectFlagToRoadSytem(const noFlag* flag, std::vector<Dire
         if(aii.FindPathOnRoads(*curFlag, *flag))
             continue;
 
+        unsigned odd = length % 2 != 0 ? 5 : 0;
         // Kürzer als der letzte? Nehmen! Existierende Strecke höher gewichten (2), damit möglichst kurze Baustrecken
         // bevorzugt werden bei ähnlich langen Wegmöglichkeiten
-        if(2 * length + distance + 10 * maxNonFlagPts < shortestLength)
+        if(odd + 2 * length + distance + 10 * maxNonFlagPts < shortestLength)
         {
             shortest = curFlag;
             shortestLength = 2 * length + distance + 10 * maxNonFlagPts;
@@ -355,7 +410,7 @@ bool AIConstruction::MinorRoadImprovements(const noRoadNode* start, const noRoad
 {
     return BuildRoad(start, target, route);
     // TODO: Enable later after checking for performance and correctness
-    RTTR_IGNORE_UNREACHABLE_CODE
+    // RTTR_IGNORE_UNREACHABLE_CODE
     MapPoint pStart = start->GetPos(); //-V779
     for(unsigned i = 0; i + 1 < route.size(); i++)
     {
@@ -462,6 +517,10 @@ helpers::OptionalEnum<BuildingType> AIConstruction::ChooseMilitaryBuilding(const
     if(!bld)
         return boost::none;
 
+    if(bldPlanner.GetNumMilitaryBlds() < 5)
+    {
+        return BuildingType::Barracks;
+    }
     const BuildingType biggestBld = GetBiggestAllowedMilBuilding().value();
 
     const Inventory& inventory = aii.GetInventory();
@@ -474,6 +533,7 @@ helpers::OptionalEnum<BuildingType> AIConstruction::ChooseMilitaryBuilding(const
             return BuildingType::Watchtower;
         return GetBiggestAllowedMilBuilding();
     }
+
     if(biggestBld == BuildingType::Watchtower || biggestBld == BuildingType::Fortress)
     {
         if(aijh.UpdateUpgradeBuilding() < 0 && bldPlanner.GetNumBuildingSites(biggestBld) < 1
@@ -557,7 +617,7 @@ bool AIConstruction::Wanted(BuildingType type) const
         return bldPlanner.WantMoreMilitaryBlds(aijh);
     if(type == BuildingType::Sawmill && bldPlanner.GetNumBuildings(BuildingType::Sawmill) > 1)
     {
-        if(aijh.AmountInStorage(GoodType::Wood) < 15 * (bldPlanner.GetNumBuildingSites(BuildingType::Sawmill) + 1))
+        if(aijh.AmountInStorage(GoodType::Wood) < 15 * bldPlanner.GetNumBuildingSites(BuildingType::Sawmill))
             return false;
     }
     return constructionorders[type] < bldPlanner.GetNumAdditionalBuildingsWanted(type);
@@ -594,8 +654,8 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
         route.clear();
         unsigned newLength;
         // the flag should not be at a military building!
-        if(aii.gwb.IsMilitaryBuildingOnNode(aii.gwb.GetNeighbour(curFlag.GetPos(), Direction::NorthWest), true))
-            continue;
+        // if(aii.gwb.IsMilitaryBuildingOnNode(aii.gwb.GetNeighbour(curFlag.GetPos(), Direction::NorthWest), true))
+        //     continue;
 
         if(!IsConnectedToRoadSystem(&curFlag))
             continue;
@@ -624,17 +684,17 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
         for(auto j : route)
         {
             t = aii.gwb.GetNeighbour(t, j);
-            MapPoint t2 = flag->GetPos();
+            // MapPoint t2 = flag->GetPos();
             // check if we cross the planned main road
-            for(auto k : mainroad)
-            {
-                t2 = aii.gwb.GetNeighbour(t2, k);
-                if(t2 == t)
-                {
-                    crossmainpath = true;
-                    break;
-                }
-            }
+            // for(auto k : mainroad)
+            // {
+            //     t2 = aii.gwb.GetNeighbour(t2, k);
+            //     if(t2 == t)
+            //     {
+            //         crossmainpath = true;
+            //         break;
+            //     }
+            // }
             RTTR_Assert(aii.GetBuildingQuality(t) == aijh.GetAINode(t).bq);
             if(aii.GetBuildingQuality(t) == BuildingQuality::Nothing)
                 temp++;
@@ -662,6 +722,24 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
     return false;
 }
 
+int AIConstruction::CountUsualBuildingInRadius(MapPoint pt, unsigned radius, BuildingType bt)
+{
+    unsigned count = 0;
+    for(const nobUsual* bld : aii.GetBuildings(bt))
+    {
+        if(aii.gwb.CalcDistance(bld->GetPos(), pt) < radius)
+            count++;
+    }
+    for(const noBuildingSite* bldSite : aii.GetBuildingSites())
+    {
+        if(bldSite->GetBuildingType() == bt)
+        {
+            if(aii.gwb.CalcDistance(bldSite->GetPos(), pt) < radius)
+                count++;
+        }
+    }
+    return count;
+}
 bool AIConstruction::OtherUsualBuildingInRadius(MapPoint pt, unsigned radius, BuildingType bt)
 {
     for(const nobUsual* bld : aii.GetBuildings(bt))

@@ -30,6 +30,7 @@ enum class StatisticTime
 {
     T15Minutes,
     T1Hour,
+    // T2Hours,
     T4Hours,
     T16Hours
 };
@@ -52,4 +53,30 @@ inline unsigned short decrStatIndex(unsigned short i)
 inline unsigned short decrStatIndex(unsigned short i, unsigned short amount)
 {
     return (i < amount) ? NUM_STAT_STEPS - (amount - i) - 1 : i - amount;
+}
+static const std::map<StatisticType, std::string> statistic_names = {
+    {StatisticType::Country, "Country"},
+    {StatisticType::Buildings, "Buildings"},
+    {StatisticType::Inhabitants, "Inhabitants"},
+    {StatisticType::Merchandise, "Merchandise"},
+    {StatisticType::Military, "Military"},
+    {StatisticType::Gold, "GoldCoins"},
+    {StatisticType::Productivity, "Productivity"},
+    {StatisticType::Vanquished, "Vanquished"},
+    {StatisticType::Tournament, "Tournament"}
+};
+static const std::map<std::string, StatisticType> STATS_NAME_MAP = {
+    {"Country", StatisticType::Country},
+    {"Buildings", StatisticType::Buildings},
+    {"Inhabitants", StatisticType::Inhabitants},
+    {"Merchandise", StatisticType::Merchandise},
+    {"Military", StatisticType::Military},
+    {"GoldCoins", StatisticType::Gold},
+    {"Productivity", StatisticType::Productivity},
+    {"Vanquished", StatisticType::Vanquished},
+    {"Tournament", StatisticType::Tournament}
+};
+
+inline std::string StatisticTypeName(StatisticType type) {
+    return statistic_names.at(type);
 }

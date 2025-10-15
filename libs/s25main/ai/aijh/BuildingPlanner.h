@@ -28,21 +28,31 @@ public:
     /// Get amount of construction sites of military buildings
     unsigned GetNumMilitaryBldSites() const;
 
+    unsigned GetNumBuildingsWanted(BuildingType type) const;
+
     void InitBuildingsWanted(const AIPlayerJH& aijh);
+    unsigned GetNumBuildings(BuildingType type, unsigned wood_available);
     void UpdateBuildingsWanted(const AIPlayerJH& aijh);
 
     /// Return the number of buildings that we want to build of the current type
     int GetNumAdditionalBuildingsWanted(BuildingType type) const;
-    /// Checks whether the ai wants to construct more mil buildings atm
+ /// Checks whether the ai wants to construct more mil buildings atm
     bool WantMoreMilitaryBlds(const AIPlayerJH& aijh) const;
     bool IsExpansionRequired() const { return expansionRequired; }
 
+    void setBuildingsWanted(helpers::EnumArray<unsigned, BuildingType> values);
+    static bool IsGoldEnabled(const AIPlayerJH& aijh);
 private:
+
     /// Number of buildings and building sites of this player (refreshed by RefreshBuildingCount())
     BuildingCount buildingNums;
     /// Contains how many buildings of every type is wanted
     helpers::EnumArray<unsigned, BuildingType> buildingsWanted;
     bool expansionRequired;
+
+    signed boardsBalance = 0;
+    unsigned woodAvailable = 0;
+    unsigned stoneAvailable = 0;
 
     void RefreshBuildingNums(const AIPlayerJH& aijh);
     bool CalcIsExpansionRequired(AIPlayerJH& aijh, bool recalc) const;
