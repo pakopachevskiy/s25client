@@ -8,6 +8,7 @@
 #include <vector>
 
 class AIPlayer;
+class ctrlComboBox;
 class ctrlMultiline;
 class GameWorldView;
 namespace AIJH {
@@ -30,6 +31,7 @@ private:
 
     GameWorldView& gwv;
     std::vector<const AIJH::AIDebugView*> ais_;
+    ctrlComboBox* buildingType;
     ctrlMultiline* text;
     DebugPrinter* printer;
 };

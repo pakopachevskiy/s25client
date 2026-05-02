@@ -11,6 +11,7 @@
 #include "controls/ctrlComboBox.h"
 #include "controls/ctrlMultiline.h"
 #include "helpers/EnumArray.h"
+#include "helpers/EnumRange.h"
 #include "helpers/toString.h"
 #include "ogl/FontStyle.h"
 #include "ogl/glFont.h"
@@ -18,16 +19,49 @@
 #include "gameData/BuildingConsts.h"
 #include "gameData/const_gui_ids.h"
 #include "s25util/colors.h"
+#include <algorithm>
 #include <array>
+#include <limits>
+#include <optional>
 #include <sstream>
+#include <utility>
+#include <vector>
 
 namespace {
 enum
 {
     ID_CbPlayer,
     ID_CbOverlay,
+    ID_CbBuildingType,
     ID_Text
 };
+
+constexpr unsigned OVERLAY_POSITION_RATING = 13;
+constexpr unsigned OVERLAY_BUILDINGS_WANTED = 14;
+constexpr unsigned BUILDINGS_WANTED_DISABLED = std::numeric_limits<unsigned>::max();
+
+BuildingType GetBuildingTypeFromSelection(const unsigned selection)
+{
+    unsigned index = 0;
+    for(const BuildingType type : helpers::enumRange<BuildingType>())
+    {
+        if(BUILDING_SIZE[type] == BuildingQuality::Nothing)
+            continue;
+        if(index == selection)
+            return type;
+        ++index;
+    }
+    return BuildingType::Headquarters;
+}
+
+void SetTextIfChanged(ctrlMultiline& text, const std::string& content)
+{
+    if(text.GetNumLines() == 1 && text.GetLine(0) == content)
+        return;
+
+    text.Clear();
+    text.AddString(content, COLOR_YELLOW);
+}
 }
 
 class iwAIDebug::DebugPrinter : public IDrawNodeCallback
@@ -37,7 +71,8 @@ class iwAIDebug::DebugPrinter : public IDrawNodeCallback
     glFont& font;
 
 public:
-    DebugPrinter(const AIJH::AIDebugView* ai, unsigned overlay) : font(*NormalFont), ai(ai), overlay(overlay)
+    DebugPrinter(const AIJH::AIDebugView* ai, unsigned overlay)
+        : font(*NormalFont), ai(ai), overlay(overlay), buildingType(BuildingType::Headquarters)
     {
         // Cache images
         bqImgs[BuildingQuality::Nothing] = nullptr;
@@ -54,6 +89,7 @@ public:
 
     const AIJH::AIDebugView* ai;
     unsigned overlay;
+    BuildingType buildingType;
 
     void onDraw(const MapPoint& pt, const DrawPoint& curPos) override
     {
@@ -71,13 +107,19 @@ public:
         else if(overlay < 13)
             font.Draw(curPos, helpers::toString(ai->GetResMapValue(pt, AIResource(overlay - 4))), FontStyle{},
                       COLOR_YELLOW);
+        else if(overlay == OVERLAY_POSITION_RATING && ai->GetAINode(pt).owned)
+        {
+            const std::optional<int> rating = ai->GetPointRating(buildingType, pt);
+            if(rating)
+                font.Draw(curPos, helpers::toString(*rating), FontStyle{}, COLOR_YELLOW);
+        }
     }
 };
 
 iwAIDebug::iwAIDebug(GameWorldView& gwv, const std::vector<const AIPlayer*>& ais)
     : IngameWindow(CGI_AI_DEBUG, IngameWindow::posLastOrCenter, Extent(280, 515), _("AI Debug"),
                    LOADER.GetImageN("resource", 41)),
-      gwv(gwv), text(nullptr), printer(nullptr)
+      gwv(gwv), buildingType(nullptr), text(nullptr), printer(nullptr)
 {
     for(const AIPlayer* ai : ais)
     {
@@ -114,9 +156,21 @@ iwAIDebug::iwAIDebug(GameWorldView& gwv, const std::vector<const AIPlayer*>& ais
     overlays->AddString("Stones");
     overlays->AddString("Plantspace");
     overlays->AddString("Borderland");
+    overlays->AddString("Position rating");
+    overlays->AddString("Buildings wanted");
 
-    // Show 7 lines of text and 1 empty line
-    text = AddMultiline(ID_Text, DrawPoint(15, 120), Extent(250, 8 * NormalFont->getHeight()), TextureColor::Grey,
+    buildingType = AddComboBox(ID_CbBuildingType, DrawPoint(15, 90), Extent(250, 20), TextureColor::Grey, NormalFont,
+                               100);
+    for(const BuildingType type : helpers::enumRange<BuildingType>())
+    {
+        if(BUILDING_SIZE[type] != BuildingQuality::Nothing)
+            buildingType->AddString(BUILDING_NAMES[type]);
+    }
+    buildingType->SetSelection(0);
+    buildingType->SetVisible(false);
+
+    // Show 15 lines of text and 1 empty line
+    text = AddMultiline(ID_Text, DrawPoint(15, 120), Extent(250, 16 * NormalFont->getHeight()), TextureColor::Grey,
                         NormalFont, FontStyle::NO_OUTLINE);
 
     SetIwSize(Extent(GetIwSize().x, text->GetPos().y + text->GetSize().y));
@@ -141,7 +195,11 @@ void iwAIDebug::Msg_ComboSelectItem(const unsigned ctrl_id, const unsigned selec
     switch(ctrl_id)
     {
         case ID_CbPlayer: printer->ai = ais_[selection]; break;
-        case ID_CbOverlay: printer->overlay = selection; break;
+        case ID_CbOverlay:
+            printer->overlay = selection;
+            buildingType->SetVisible(selection == OVERLAY_POSITION_RATING);
+            break;
+        case ID_CbBuildingType: printer->buildingType = GetBuildingTypeFromSelection(selection); break;
     }
 }
 
@@ -150,11 +208,35 @@ void iwAIDebug::Msg_PaintBefore()
     IngameWindow::Msg_PaintBefore();
     std::stringstream ss;
 
+    if(printer->overlay == OVERLAY_BUILDINGS_WANTED)
+    {
+        ss << "Buildings wanted:" << std::endl << std::endl;
+        std::vector<std::pair<std::string, unsigned>> wantedBuildings;
+        for(const BuildingType type : helpers::enumRange<BuildingType>())
+        {
+            if(BUILDING_SIZE[type] == BuildingQuality::Nothing)
+                continue;
+
+            const unsigned wanted = printer->ai->GetNumBuildingsWanted(type);
+            if(wanted == BUILDINGS_WANTED_DISABLED)
+                continue;
+
+            wantedBuildings.emplace_back(BUILDING_NAMES[type], wanted);
+        }
+        std::sort(wantedBuildings.begin(), wantedBuildings.end(),
+                  [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
+
+        for(const auto& wantedBuilding : wantedBuildings)
+            ss << wantedBuilding.first << ": " << wantedBuilding.second << std::endl;
+
+        SetTextIfChanged(*text, ss.str());
+        return;
+    }
+
     const AIJH::AIJob* currentJob = printer->ai->GetCurrentJob();
     if(!currentJob)
     {
-        text->Clear();
-        text->AddString(_("No current job"), COLOR_YELLOW);
+        SetTextIfChanged(*text, _("No current job"));
         return;
     }
 
@@ -216,6 +298,5 @@ void iwAIDebug::Msg_PaintBefore()
         default: ss << "Unknown status"; break;
     }
 
-    text->Clear();
-    text->AddString(ss.str(), COLOR_YELLOW);
+    SetTextIfChanged(*text, ss.str());
 }

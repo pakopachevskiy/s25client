@@ -19,12 +19,12 @@ public:
     GlobalPositionFinder(AIPlanningContext& aijh);
 
     MapPoint FindBestPosition(BuildingType bt);
+    std::optional<int> GetPointRating(BuildingType type, const MapPoint& pt) const;
 
 private:
     bool CheckProximity(BuildingType type, const MapPoint& pt) const;
     bool ValidFishInRange(MapPoint pt) const;
     bool ValidStoneinRange(MapPoint pt) const;
-    std::optional<int> GetPointRating(BuildingType type, const MapPoint& pt) const;
 
     AIPlanningContext& aijh;
 };

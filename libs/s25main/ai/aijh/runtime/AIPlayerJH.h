@@ -20,6 +20,7 @@
 
 #include <list>
 #include <memory>
+#include <optional>
 #include <queue>
 #include <vector>
 
@@ -106,6 +107,8 @@ public:
 
     Node& GetAINode(MapPoint pt);
     const Node& GetAINode(MapPoint pt) const;
+    std::optional<int> GetPointRating(BuildingType type, MapPoint pt) const override;
+    unsigned GetNumBuildingsWanted(BuildingType type) const override;
 
     unsigned GetNumPlannedConnectedInlandMilitaryBlds()
     {

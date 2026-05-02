@@ -16,6 +16,13 @@
 #include <numeric>
 #include <sstream>
 
+static bool TryParseNumber(const std::string& str, int& num)
+{
+    s25util::ClassicImbuedStream<std::istringstream> ss(str);
+    ss >> num;
+    return bool(ss);
+}
+
 /// Return <0 for a < b; >0 for a>b and 0 for a==b
 static int Compare(const std::string& a, const std::string& b, ctrlTable::SortType sortType)
 {
@@ -42,14 +49,15 @@ static int Compare(const std::string& a, const std::string& b, ctrlTable::SortTy
         break;
         case SRT::Number:
         {
-            s25util::ClassicImbuedStream<std::istringstream> ss_a(a);
-            s25util::ClassicImbuedStream<std::istringstream> ss_b(b);
-            int num_a, num_b;
-            ss_a >> num_a;
-            ss_b >> num_b;
-            RTTR_Assert(ss_a);
-            RTTR_Assert(ss_b);
-            return num_a - num_b;
+            int num_a;
+            int num_b;
+            const bool hasNumA = TryParseNumber(a, num_a);
+            const bool hasNumB = TryParseNumber(b, num_b);
+            if(hasNumA && hasNumB)
+                return num_a - num_b;
+            if(hasNumA != hasNumB)
+                return hasNumA ? 1 : -1;
+            return a.compare(b);
         }
         break;
         case SRT::Date:

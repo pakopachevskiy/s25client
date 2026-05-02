@@ -4,6 +4,8 @@
 
 #include "AIPlayerJH.h"
 
+#include "ai/aijh/planning/BuildingPlanner.h"
+#include "ai/aijh/planning/GlobalPositionFinder.h"
 #include "ai/aijh/runtime/AIWorldQueries.h"
 
 namespace AIJH {
@@ -76,6 +78,16 @@ unsigned AIPlayerJH::GetNumAIRelevantSeaIds() const
 unsigned AIPlayerJH::GetProductivity(BuildingType type) const
 {
     return worldQueries_->GetProductivity(type);
+}
+
+std::optional<int> AIPlayerJH::GetPointRating(const BuildingType type, const MapPoint pt) const
+{
+    return globalPositionFinder->GetPointRating(type, pt);
+}
+
+unsigned AIPlayerJH::GetNumBuildingsWanted(const BuildingType type) const
+{
+    return bldPlanner->GetNumBuildingsWanted(type);
 }
 
 } // namespace AIJH

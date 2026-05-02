@@ -6,8 +6,10 @@
 
 #include "ai/AIResource.h"
 #include "ai/aijh/runtime/AIMap.h"
+#include "gameTypes/BuildingType.h"
 #include "gameTypes/MapCoordinates.h"
 
+#include <optional>
 #include <string>
 
 namespace AIJH {
@@ -24,6 +26,8 @@ public:
     virtual unsigned GetNumJobs() const = 0;
     virtual const Node& GetAINode(MapPoint pt) const = 0;
     virtual int GetResMapValue(MapPoint pt, AIResource res) const = 0;
+    virtual std::optional<int> GetPointRating(BuildingType type, MapPoint pt) const = 0;
+    virtual unsigned GetNumBuildingsWanted(BuildingType type) const = 0;
 };
 
 } // namespace AIJH

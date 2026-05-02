@@ -43,13 +43,13 @@ public:
     {
     public:
         /// Haupttabs
-        bool build, setflag, watch, flag, cutroad, upgradeRoad, attack, sea_attack, info;
+        bool build, setflag, watch, flag, cutroad, upgradeRoad, attack, sea_attack, info, point_rating;
         /// Gebäude-Bau-Tabs
         BuildTab build_tabs;
 
         Tabs()
             : build(false), setflag(false), watch(false), flag(false), cutroad(false), upgradeRoad(false),
-              attack(false), sea_attack(false), info(false), build_tabs(BuildTab::Hut)
+              attack(false), sea_attack(false), info(false), point_rating(false), build_tabs(BuildTab::Hut)
         {}
     };
 

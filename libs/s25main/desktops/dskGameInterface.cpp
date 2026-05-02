@@ -611,6 +611,10 @@ bool dskGameInterface::Msg_LeftDown(const MouseCoords& mc)
         }
 
         action_tabs.watch = true;
+        const unsigned territoryOwner = worldViewer.GetWorld().GetNode(cSel).owner;
+        action_tabs.point_rating =
+          territoryOwner != 0 && worldViewer.GetWorld().GetPlayer(territoryOwner - 1).ps == PlayerState::AI;
+
         // Unser Land
         if(worldViewer.IsOwner(cSel))
         {
