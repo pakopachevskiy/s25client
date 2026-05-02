@@ -22,7 +22,7 @@ Text and protobuf event loggers buffer new records in memory and flush them when
 ## WareEventLogger
 
 ### Purpose
-Tracks inventory ware deltas per player.
+Tracks inventory ware deltas per player and building.
 
 ### Hooks
 - `GamePlayer::IncreaseInventoryWare(...)`
@@ -38,6 +38,7 @@ Tracks inventory ware deltas per player.
 ### Notes
 - Ware type is normalized through `ConvertShields(...)` before logging.
 - `playerId` is written as 1-based (`playerId + 1`).
+- Each record includes the ID of the building where the ware event occurred.
 
 ## BuildingEventLogger
 
