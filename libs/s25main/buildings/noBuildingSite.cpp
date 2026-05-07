@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "buildings/noBuildingSite.h"
+#include "BuildingEventLogger.h"
+#include "EventManager.h"
 #include "FOWObjects.h"
 #include "GamePlayer.h"
 #include "Loader.h"
@@ -240,6 +242,8 @@ void noBuildingSite::GotWorker(Job /*job*/, noFigure& worker)
     {
         RTTR_Assert(worker.GetGOT() == GO_Type::NofBuilder);
         builder = static_cast<nofBuilder*>(&worker);
+        BuildingEventLogger::LogBuilderArrive(world->GetEvMgr().GetCurrentGF(), player, bldType_, GetObjId(), pos.x,
+                                              pos.y);
     }
 }
 
@@ -301,11 +305,15 @@ void noBuildingSite::AddWare(std::unique_ptr<Ware> ware)
         RTTR_Assert(helpers::contains(ordered_boards, ware.get()));
         ordered_boards.remove(ware.get());
         ++boards;
+        BuildingEventLogger::LogBoardDeliver(world->GetEvMgr().GetCurrentGF(), player, bldType_, GetObjId(), pos.x,
+                                             pos.y);
     } else if(ware->type == GoodType::Stones)
     {
         RTTR_Assert(helpers::contains(ordered_stones, ware.get()));
         ordered_stones.remove(ware.get());
         ++stones;
+        BuildingEventLogger::LogStoneDeliver(world->GetEvMgr().GetCurrentGF(), player, bldType_, GetObjId(), pos.x,
+                                             pos.y);
     } else
         throw std::logic_error("Wrong ware type " + helpers::toString(ware->type));
 

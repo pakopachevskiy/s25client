@@ -43,11 +43,14 @@ Tracks inventory ware deltas per player and building.
 ## BuildingEventLogger
 
 ### Purpose
-Tracks building lifecycle events in a unified CSV stream.
+Tracks building lifecycle events in a unified protobuf stream.
 
 ### Events
 - `construction_site_created`
 - `construction_site_cancelled`
+- `builder_arrive`
+- `board_deliver`
+- `stone_deliver`
 - `constructed`
 - `inhabited`
 - `destroyed`
@@ -58,6 +61,10 @@ Tracks building lifecycle events in a unified CSV stream.
   - `GamePlayer::AddBuildingSite(...)`
 - Construction site cancelled:
   - `GamePlayer::RemoveBuildingSite(...)`
+- Builder arrival:
+  - Builder path in `noBuildingSite::GotWorker(...)`
+- Material delivered:
+  - Board and stone paths in `noBuildingSite::AddWare(...)`
 - Constructed:
   - Builder completion path in `nofBuilder`
 - Inhabited:
@@ -71,14 +78,15 @@ Tracks building lifecycle events in a unified CSV stream.
   - `nobMilitary::Capture(...)`
 
 ### Output
-- File: `building_log.csv`
-- Format: CSV
-- Header:
-  - `gameframe,playerId,event,buildingType,buildingId,x,y`
+- File: `building_log.pb`
+- Format: length-delimited protobuf stream of `BuildingLogRecord`
+- Schema: `external/proto-repo/building_log.proto`
 
 ### Notes
 - A completed construction site is marked via `MarkConstructionSiteConstructed(...)` so it is not additionally logged as `construction_site_cancelled`.
 - Construction-site events use the construction site's object ID as `buildingId`.
+- `board_deliver` and `stone_deliver` are written once per delivered ware, after the ware reaches the construction site.
+- `delta_gf` is the delta from the previous logged building event in the same file.
 - `inhabited` is emitted when a building first counts as staffed: a worker for usual buildings, a stationed soldier for
   military buildings, and immediately on construction for warehouses. Initial headquarters placement is logged as
   inhabited immediately.

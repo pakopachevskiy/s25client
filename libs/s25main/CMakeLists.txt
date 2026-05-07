@@ -84,6 +84,11 @@ protobuf_generate_cpp(WARES_LOG_PROTO_SRCS WARES_LOG_PROTO_HDRS ${WARES_LOG_PROT
 set_source_files_properties(${WARES_LOG_PROTO_SRCS} PROPERTIES COMPILE_OPTIONS "-Wno-missing-declarations")
 list(APPEND s25Main_SRCS ${WARES_LOG_PROTO_SRCS} ${WARES_LOG_PROTO_HDRS})
 
+set(BUILDING_LOG_PROTO ${PROJECT_SOURCE_DIR}/external/proto-repo/building_log.proto)
+protobuf_generate_cpp(BUILDING_LOG_PROTO_SRCS BUILDING_LOG_PROTO_HDRS ${BUILDING_LOG_PROTO})
+set_source_files_properties(${BUILDING_LOG_PROTO_SRCS} PROPERTIES COMPILE_OPTIONS "-Wno-missing-declarations")
+list(APPEND s25Main_SRCS ${BUILDING_LOG_PROTO_SRCS} ${BUILDING_LOG_PROTO_HDRS})
+
 set(COMBAT_LOG_PROTOS
     ${PROJECT_SOURCE_DIR}/external/proto-repo/commons.proto
     ${PROJECT_SOURCE_DIR}/external/proto-repo/combat_log.proto

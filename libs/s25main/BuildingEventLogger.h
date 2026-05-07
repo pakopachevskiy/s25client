@@ -13,6 +13,12 @@ void LogConstructionSiteCreated(unsigned gf, unsigned char playerId, BuildingTyp
 void MarkConstructionSiteConstructed(const void* sitePtr);
 void LogConstructionSiteCancelled(unsigned gf, unsigned char playerId, BuildingType buildingType, unsigned buildingId,
                                   unsigned x, unsigned y, const void* sitePtr);
+void LogBuilderArrive(unsigned gf, unsigned char playerId, BuildingType buildingType, unsigned buildingId, unsigned x,
+                      unsigned y);
+void LogBoardDeliver(unsigned gf, unsigned char playerId, BuildingType buildingType, unsigned buildingId, unsigned x,
+                     unsigned y);
+void LogStoneDeliver(unsigned gf, unsigned char playerId, BuildingType buildingType, unsigned buildingId, unsigned x,
+                     unsigned y);
 void LogBuildingConstructed(unsigned gf, unsigned char playerId, BuildingType buildingType, unsigned buildingId,
                            unsigned x, unsigned y);
 void LogBuildingInhabited(unsigned gf, unsigned char playerId, BuildingType buildingType, unsigned buildingId,
