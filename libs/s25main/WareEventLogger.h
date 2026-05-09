@@ -8,6 +8,6 @@
 
 namespace WareEventLogger {
 
-void LogInventoryChange(unsigned gf, unsigned char playerId, GoodType good, int count);
+void LogInventoryChange(unsigned gf, unsigned char playerId, GoodType good, int count, unsigned buildingId);
 
 } // namespace WareEventLogger

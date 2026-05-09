@@ -10,21 +10,6 @@
 
 namespace AIJH {
 
-void AIPlayerJH::TrackCombatStart(const nobBaseMilitary& target)
-{
-    statsReporter_->TrackCombatStart(target);
-}
-
-void AIPlayerJH::InitializeCombatsLogFile() const
-{
-    statsReporter_->InitializeCombatsLogFile();
-}
-
-void AIPlayerJH::LogFinishedCombats(unsigned gf) const
-{
-    statsReporter_->LogFinishedCombats(gf);
-}
-
 void AIPlayerJH::saveStats(unsigned gf) const
 {
     statsReporter_->SaveStats(gf);

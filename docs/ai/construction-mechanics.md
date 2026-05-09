@@ -83,6 +83,59 @@ See also:
   the counts reset. `Wanted()` compares these counters to the `BuildingPlanner` demand so the
   AI only spawns as many work orders as strategic planning requested.
 
+## Building Periods
+- The deterministic builder-only period starts after `noBuildingSite::GotWorker` receives a
+  `nofBuilder`, assumes all construction wares are already available at the site, and excludes
+  builder travel, carrier delivery, waiting for missing materials, and optional leveling.
+- Medium, large, and harbor sites may first enter `BuildingSiteState::Planing` when neighboring
+  terrain heights differ. That planer phase depends on worker travel and local terrain, so it is
+  not part of the fixed periods below.
+- `BUILDING_COSTS[type]` gives the number of boards and stones. Each ware provides 8 build
+  steps through `nofBuilder::ChooseWare()`. Each step costs 17 GF of build freewalk plus 40 GF
+  of hammering, and each ware chunk is followed by one 17 GF freewalk before either picking the
+  next ware or completing the building. The first material pickup is preceded by a 24 GF waiting
+  freewalk.
+- Formula: `builderPeriodGF = 24 + (boards + stones) * (8 * (17 + 40) + 17)`, or
+  `24 + (boards + stones) * 473`.
+
+| Building type | Boards | Stones | Build steps | Builder period (GF) |
+| --- | ---: | ---: | ---: | ---: |
+| Barracks | 2 | 0 | 16 | 970 |
+| Guardhouse | 2 | 3 | 40 | 2389 |
+| Watchtower | 3 | 5 | 64 | 3808 |
+| Vineyard | 4 | 4 | 64 | 3808 |
+| Winery | 2 | 3 | 40 | 2389 |
+| Temple | 4 | 7 | 88 | 5227 |
+| Fortress | 4 | 7 | 88 | 5227 |
+| GraniteMine | 4 | 0 | 32 | 1916 |
+| CoalMine | 4 | 0 | 32 | 1916 |
+| IronMine | 4 | 0 | 32 | 1916 |
+| GoldMine | 4 | 0 | 32 | 1916 |
+| LookoutTower | 4 | 0 | 32 | 1916 |
+| Catapult | 4 | 2 | 48 | 2862 |
+| Woodcutter | 2 | 0 | 16 | 970 |
+| Fishery | 2 | 0 | 16 | 970 |
+| Quarry | 2 | 0 | 16 | 970 |
+| Forester | 2 | 0 | 16 | 970 |
+| Slaughterhouse | 2 | 2 | 32 | 1916 |
+| Hunter | 2 | 0 | 16 | 970 |
+| Brewery | 2 | 2 | 32 | 1916 |
+| Armory | 2 | 2 | 32 | 1916 |
+| Metalworks | 2 | 2 | 32 | 1916 |
+| Ironsmelter | 2 | 2 | 32 | 1916 |
+| Charburner | 4 | 3 | 56 | 3335 |
+| PigFarm | 3 | 3 | 48 | 2862 |
+| Storehouse | 4 | 3 | 56 | 3335 |
+| Mill | 2 | 2 | 32 | 1916 |
+| Bakery | 2 | 2 | 32 | 1916 |
+| Sawmill | 2 | 2 | 32 | 1916 |
+| Mint | 2 | 2 | 32 | 1916 |
+| Well | 2 | 0 | 16 | 970 |
+| Shipyard | 2 | 3 | 40 | 2389 |
+| Farm | 3 | 3 | 48 | 2862 |
+| DonkeyBreeder | 3 | 3 | 48 | 2862 |
+| HarborBuilding | 4 | 6 | 80 | 4754 |
+
 ## Road and Flag Utilities
 - `FindFlags` gathers nearby valid `noFlag` objects for the player (wrapping-safe) so the AI
   knows where existing infrastructure lies.

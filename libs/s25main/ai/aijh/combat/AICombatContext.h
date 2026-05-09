@@ -9,7 +9,6 @@
 
 class AIInterface;
 class GameWorldBase;
-class nobBaseMilitary;
 struct AIConfig;
 
 namespace AIJH {
@@ -34,7 +33,6 @@ public:
     virtual AI::Level GetLevel() const = 0;
 
     virtual bool IsRecentlyLostMilitaryBuilding(MapPoint pt) const = 0;
-    virtual void TrackCombatStart(const nobBaseMilitary& target) = 0;
 };
 
 } // namespace AIJH

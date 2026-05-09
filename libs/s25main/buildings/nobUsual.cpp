@@ -118,7 +118,7 @@ void nobUsual::DestroyBuilding()
     {
         const GoodType ware = BLD_WORK_DESC[bldType_].waresNeeded[i];
         RTTR_Assert(ware != GoodType::Nothing);
-        world->GetPlayer(player).DecreaseInventoryWare(ware, numWares[i]);
+        world->GetPlayer(player).DecreaseInventoryWare(ware, numWares[i], GetObjId());
     }
 }
 
@@ -419,7 +419,7 @@ void nobUsual::ConsumeWares()
         // Bestand verringern
         --numWares[wareIdxToUse];
         // Inventur entsprechend verringern
-        owner.DecreaseInventoryWare(workDesc.waresNeeded[wareIdxToUse], 1);
+        owner.DecreaseInventoryWare(workDesc.waresNeeded[wareIdxToUse], 1, GetObjId());
 
         // try to get ware from warehouses
         if(numWares[wareIdxToUse] < 2)

@@ -4,35 +4,22 @@ See also:
 
 - [performance-profiling.md](performance-profiling.md) — sibling
   pipeline that writes `ai_performance.csv` and the shutdown summary.
-- [attack-target-selection.md](attack-target-selection.md) —
-  `TrackCombatStart` is invoked from the target-selection flow.
 - [adjustments.md](adjustments.md) — `saveStats` re-uses the
   distribution-slider snapshot described there.
 
 `libs/s25main/ai/aijh/debug/AIStatsReporter.cpp` implements the telemetry
 pipeline used by the JH AI, while
 `libs/s25main/ai/aijh/runtime/AIPlayerJHStats.cpp` keeps the compatibility
-entry points on `AIPlayerJH`. Together they capture both long-term economy
-metrics and short-lived combat outcomes. The code is organized around three
-main areas: combat tracking, per-frame CSV dumps, and less frequent
-human-readable snapshots.
+entry points on `AIPlayerJH`. Together they capture long-term economy metrics
+through per-frame CSV dumps and less frequent human-readable snapshots.
 
 ## Combat tracking & logging
 
-- `TrackCombatStart` registers every initiated attack: it records the target
-  position/object, defender ID, and building type while seeding the
-  `CombatLossTracker` with the target object ID and capture risk.
-- `LogFinishedCombats` runs every frame. It inspects `activeCombats_`, uses
-  `EvaluateCombatState` to decide if each combat succeeded, failed, or is still
-  pending, and flushes finished entries to `combats.txt` under
-  `STATS_CONFIG.statsPath`.
-- Log lines include attacker/defender player indices, the targeted building,
-  outcome, formatted per-rank force/loss breakdowns (`FormatRankCounts`),
-  capture-risk percentage, and for successful assaults the destroyed-building
-  list (`FormatDestroyedBuildings`).
-- `InitializeCombatsLogFile` writes a one-time header describing active
-  players via `FormatPlayerLabel`, ensuring analyst logs start with roster
-  metadata.
+Combat logging is no longer owned by `AIStatsReporter`. The current combat
+pipeline lives in `libs/s25main/CombatEventLogger.cpp` and writes
+`combat_log.pb` under `STATS_CONFIG.statsPath` when the `combat` event logger is
+enabled. It records attack orders, aggressive defender orders, fight results,
+captures, and capture-time destroyed-building context.
 
 ## Periodic CSV snapshots
 

@@ -264,7 +264,7 @@ void Ware::WareLost(const unsigned char player)
 {
     location = nullptr;
     // Inventur verringern
-    world->GetPlayer(player).DecreaseInventoryWare(type, 1);
+    world->GetPlayer(player).DecreaseInventoryWare(type, 1, goal ? goal->GetObjId() : 0);
     // Ziel der Ware Bescheid sagen
     NotifyGoalAboutLostWare();
     // Zentrale Registrierung der Ware löschen

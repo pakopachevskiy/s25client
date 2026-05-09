@@ -234,9 +234,6 @@ void AIPlayerJH::RunGF(const unsigned gf, bool gfisnwf)
     currentGF_ = gf;
     militaryLogistics_->PruneRecentlyLostBuildings();
 
-    if(gf == 0)
-        InitializeCombatsLogFile();
-    LogFinishedCombats(gf);
     perfReporter_->MaybeLog(gf);
 
     const ScopedAIRuntimeProfile runGfProfile(AIRuntimeProfileSection::RunGF);

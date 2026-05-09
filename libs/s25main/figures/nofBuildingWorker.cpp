@@ -153,7 +153,7 @@ void nofBuildingWorker::WorkingReady()
             real_ware->WaitAtFlag(flag);
             // Increase inventory accordingly, distinguishing shields!
             GoodType ware_type = ConvertShields(real_ware->type);
-            world->GetPlayer(player).IncreaseInventoryWare(ware_type, 1);
+            world->GetPlayer(player).IncreaseInventoryWare(ware_type, 1, workplace ? workplace->GetObjId() : 0);
             // Find a recipient for the ware
             real_ware->SetGoal(world->GetPlayer(player).FindClientForWare(*real_ware));
             // Ware should calculate its further route

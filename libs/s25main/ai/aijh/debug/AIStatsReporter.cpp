@@ -136,12 +136,6 @@ namespace AIJH {
 
 AIStatsReporter::AIStatsReporter(const AIStatsSource& owner) : owner_(owner) {}
 
-void AIStatsReporter::TrackCombatStart(const nobBaseMilitary& /*target*/) {}
-
-void AIStatsReporter::InitializeCombatsLogFile() const {}
-
-void AIStatsReporter::LogFinishedCombats(const unsigned /*gf*/) const {}
-
 void AIStatsReporter::SaveStats(unsigned gf) const
 {
     const GamePlayer& player = owner_.GetPlayer();

@@ -149,8 +149,7 @@ void AICombatController::TryToAttack()
     if(attackersCount == 0)
         return;
 
-    if(commands.Attack(target->GetPos(), attackersCount, true))
-        owner_.TrackCombatStart(*target);
+    commands.Attack(target->GetPos(), attackersCount, true);
 }
 
 unsigned AICombatController::CalcPotentialAttackers(const nobBaseMilitary& target) const
@@ -271,7 +270,6 @@ void AICombatController::TrySeaAttack()
               world.GetSoldiersForSeaAttack(owner_.GetPlayerId(), targetMilBld->GetPos());
             if(!attackers.empty() && commands.SeaAttack(targetMilBld->GetPos(), 1, true))
             {
-                owner_.TrackCombatStart(*targetMilBld);
                 return;
             }
         }
@@ -316,7 +314,6 @@ void AICombatController::TrySeaAttack()
               world.GetSoldiersForSeaAttack(owner_.GetPlayerId(), targetMilBld->GetPos());
             if(!attackers.empty() && commands.SeaAttack(targetMilBld->GetPos(), 1, true))
             {
-                owner_.TrackCombatStart(*targetMilBld);
                 return;
             }
         }
@@ -333,7 +330,6 @@ void AICombatController::TrySeaAttack()
               world.GetSoldiersForSeaAttack(owner_.GetPlayerId(), ship->GetPos());
             if(!attackers.empty() && commands.SeaAttack(ship->GetPos(), attackers.size(), true))
             {
-                owner_.TrackCombatStart(*ship);
                 return;
             }
         }

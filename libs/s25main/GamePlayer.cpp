@@ -1810,19 +1810,19 @@ bool GamePlayer::IsWareDependent(const Ware& ware)
     return false;
 }
 
-void GamePlayer::IncreaseInventoryWare(const GoodType ware, const unsigned count)
+void GamePlayer::IncreaseInventoryWare(const GoodType ware, const unsigned count, const unsigned buildingId)
 {
     const GoodType normalized = ConvertShields(ware);
     WareEventLogger::LogInventoryChange(world.GetEvMgr().GetCurrentGF(), static_cast<unsigned char>(GetPlayerId()),
-                                        normalized, static_cast<int>(count));
+                                        normalized, static_cast<int>(count), buildingId);
     global_inventory.Add(normalized, count);
 }
 
-void GamePlayer::DecreaseInventoryWare(const GoodType ware, const unsigned count)
+void GamePlayer::DecreaseInventoryWare(const GoodType ware, const unsigned count, const unsigned buildingId)
 {
     const GoodType normalized = ConvertShields(ware);
     WareEventLogger::LogInventoryChange(world.GetEvMgr().GetCurrentGF(), static_cast<unsigned char>(GetPlayerId()),
-                                        normalized, -static_cast<int>(count));
+                                        normalized, -static_cast<int>(count), buildingId);
     global_inventory.Remove(normalized, count);
 }
 

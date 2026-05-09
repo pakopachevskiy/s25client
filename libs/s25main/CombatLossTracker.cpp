@@ -43,13 +43,6 @@ const nobBaseMilitary* GetTargetBuilding(const nofDefender& defender)
 
 namespace CombatLossTracker {
 
-void RegisterCombat(const unsigned targetObjId, const double captureRisk)
-{
-    CombatStats& stats = gCombatStats[targetObjId];
-    stats = CombatStats{};
-    stats.captureRisk = std::clamp(captureRisk, 0.0, 1.0);
-}
-
 CombatStats TakeStats(const unsigned targetObjId)
 {
     const auto it = gCombatStats.find(targetObjId);

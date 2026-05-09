@@ -81,7 +81,7 @@ PendingFlushAtExit gPendingFlushAtExit;
 
 namespace WareEventLogger {
 
-void LogInventoryChange(unsigned gf, unsigned char playerId, GoodType good, int count)
+void LogInventoryChange(unsigned gf, unsigned char playerId, GoodType good, int count, unsigned buildingId)
 {
     if(!STATS_CONFIG.IsEventLoggerEnabled(EventLoggerType::Ware))
         return;
@@ -99,6 +99,7 @@ void LogInventoryChange(unsigned gf, unsigned char playerId, GoodType good, int 
     record.set_player_id(static_cast<uint32_t>(playerId + 1));
     record.set_good_type(ToProtoGoodType(good));
     record.set_delta(count);
+    record.set_building_id(static_cast<uint32_t>(buildingId));
     gPendingRecords.push_back(record);
 
     if(!gHasNextFlushGF)

@@ -158,7 +158,6 @@ public:
     void HandleNewColonyFounded(MapPoint pt);
     void HandleLostLand(MapPoint pt);
     bool IsRecentlyLostMilitaryBuilding(MapPoint pt) const;
-    void TrackCombatStart(const nobBaseMilitary& target);
 
 private:
 #define RTTR_AIJH_INCLUDE_AI_PLAYER_JH_INTERNAL

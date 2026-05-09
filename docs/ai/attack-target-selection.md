@@ -15,8 +15,8 @@ See also:
 - [performance-profiling.md](performance-profiling.md) — the
   `Attrition*`, `TryToAttack`, and `TrySeaAttack` profiler sections cover
   this code path.
-- [statistics-logging.md](statistics-logging.md) — `TrackCombatStart`
-  feeds the combat outcome log written from here.
+- [statistics-logging.md](statistics-logging.md) — AI economy telemetry and
+  the separate combat event logging pipeline.
 
 ## Trigger Flow
 
@@ -50,7 +50,7 @@ See also:
     targetSelection: Prudent   # Prudent | Biting | Attrition
    ```
 6. `TryToAttack()` now simply asks for a target via the configured mode and
-   issues `aii.Attack`/`TrackCombatStart` when a plan is available.
+   issues `aii.Attack` when a plan is available.
 
 ## Evaluating Candidates
 
@@ -69,7 +69,7 @@ While evaluating potential targets the controller:
    attacked as soon as at least one attacker is available.
 4. If all checks pass the method returns the target to `TryToAttack()`,
    which then re-counts nearby attackers before calling
-   `aii.Attack(dest, attackersCount, true)` and `TrackCombatStart`.
+   `aii.Attack(dest, attackersCount, true)`.
 5. The helper stops after finding the first valid attack; any remaining
    potential targets are reconsidered during the next interval.
 

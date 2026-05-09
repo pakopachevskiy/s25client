@@ -67,8 +67,6 @@
 
     double ComputeFulfillmentLevel(double* outTotalWeight = nullptr) const;
     double ComputeEnemyFrontlineWeight() const;
-    void LogFinishedCombats(unsigned gf) const;
-    void InitializeCombatsLogFile() const;
     void RememberLostMilitaryBuilding(MapPoint pt);
     void ForgetLostMilitaryBuilding(MapPoint pt);
     void PruneRecentlyLostBuildings();

@@ -138,7 +138,7 @@ void nobMilitary::DestroyBuilding()
     GetEvMgr().RemoveEvent(upgrade_event);
 
     // Remove remaining gold coins from the player's stock
-    world->GetPlayer(player).DecreaseInventoryWare(GoodType::Coins, numCoins);
+    world->GetPlayer(player).DecreaseInventoryWare(GoodType::Coins, numCoins, GetObjId());
 
     nobBaseMilitary::DestroyBuilding();
     // If this was occupied, recalc territory. AFTER calling base destroy as otherwise figures might get stuck here
@@ -311,7 +311,7 @@ void nobMilitary::HandleEvent(const unsigned id)
 
                 // Consume one gold coin
                 --numCoins;
-                world->GetPlayer(player).DecreaseInventoryWare(GoodType::Coins, 1);
+                world->GetPlayer(player).DecreaseInventoryWare(GoodType::Coins, 1, GetObjId());
 
                 RegulateTroops();
 
@@ -1021,8 +1021,8 @@ void nobMilitary::Capture(const unsigned char new_owner)
     InvalidateBuildingsLostOnCaptureCache();
 
     // Transfer the stored gold coins from the old player to the new owner
-    world->GetPlayer(player).DecreaseInventoryWare(GoodType::Coins, numCoins);
-    world->GetPlayer(new_owner).IncreaseInventoryWare(GoodType::Coins, numCoins);
+    world->GetPlayer(player).DecreaseInventoryWare(GoodType::Coins, numCoins, GetObjId());
+    world->GetPlayer(new_owner).IncreaseInventoryWare(GoodType::Coins, numCoins, GetObjId());
 
     // Reset desired troop setting
     troop_limits.fill(GetMaxTroopsCt());

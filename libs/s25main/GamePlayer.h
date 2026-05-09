@@ -177,8 +177,8 @@ public:
     bool IsWareDependent(const Ware& ware);
 
     /// Add wares to inventory
-    void IncreaseInventoryWare(GoodType ware, unsigned count);
-    void DecreaseInventoryWare(GoodType ware, unsigned count);
+    void IncreaseInventoryWare(GoodType ware, unsigned count, unsigned buildingId = 0);
+    void DecreaseInventoryWare(GoodType ware, unsigned count, unsigned buildingId = 0);
     void IncreaseInventoryJob(const Job job, unsigned count) { global_inventory.Add(job, count); }
     void DecreaseInventoryJob(const Job job, unsigned count) { global_inventory.Remove(job, count); }
 

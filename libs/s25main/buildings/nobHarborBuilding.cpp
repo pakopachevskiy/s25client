@@ -91,8 +91,8 @@ void nobHarborBuilding::DestroyBuilding()
     // Deduct accumulated expedition materials from inventory
     if(expedition.active)
     {
-        owner.DecreaseInventoryWare(GoodType::Boards, expedition.boards);
-        owner.DecreaseInventoryWare(GoodType::Stones, expedition.stones);
+        owner.DecreaseInventoryWare(GoodType::Boards, expedition.boards, GetObjId());
+        owner.DecreaseInventoryWare(GoodType::Stones, expedition.stones, GetObjId());
 
         // Release the assigned builder if necessary
         if(expedition.builder)
@@ -329,7 +329,7 @@ void nobHarborBuilding::StartExpedition()
            && inventory[Job::Helper] > 1) // maybe have a hammer & helper to create our own builder?
         {
             inventory.Remove(GoodType::Hammer);
-            owner.DecreaseInventoryWare(GoodType::Hammer, 1);
+            owner.DecreaseInventoryWare(GoodType::Hammer, 1, GetObjId());
             inventory.Remove(Job::Helper);
             owner.DecreaseInventoryJob(Job::Helper, 1);
 

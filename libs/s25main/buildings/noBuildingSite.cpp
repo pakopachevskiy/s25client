@@ -68,8 +68,8 @@ noBuildingSite::noBuildingSite(const MapPoint pos, const unsigned char player)
     builder = &world->AddFigure(pos, std::make_unique<nofBuilder>(pos, player, this));
 
     // Deduct the construction materials from the owner's inventory
-    owner.DecreaseInventoryWare(GoodType::Boards, boards);
-    owner.DecreaseInventoryWare(GoodType::Stones, stones);
+    owner.DecreaseInventoryWare(GoodType::Boards, boards, GetObjId());
+    owner.DecreaseInventoryWare(GoodType::Stones, stones, GetObjId());
 }
 
 noBuildingSite::~noBuildingSite() = default;
@@ -318,7 +318,7 @@ void noBuildingSite::AddWare(std::unique_ptr<Ware> ware)
         throw std::logic_error("Wrong ware type " + helpers::toString(ware->type));
 
     // Decrease the player's inventory accordingly
-    world->GetPlayer(player).DecreaseInventoryWare(ware->type, 1);
+    world->GetPlayer(player).DecreaseInventoryWare(ware->type, 1, GetObjId());
     world->GetPlayer(player).RemoveWare(*ware);
 }
 

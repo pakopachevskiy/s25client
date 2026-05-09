@@ -131,7 +131,7 @@ void noBaseBuilding::Destroy()
                     auto ware = std::make_unique<Ware>(goods[which], nullptr, flag);
                     ware->WaitAtFlag(flag);
                     // Update the inventory
-                    world->GetPlayer(player).IncreaseInventoryWare(goods[which], 1);
+                    world->GetPlayer(player).IncreaseInventoryWare(goods[which], 1, GetObjId());
                     // Assign a client for the ware
                     ware->SetGoal(world->GetPlayer(player).FindClientForWare(*ware));
                     // Recalculate the ware's route
