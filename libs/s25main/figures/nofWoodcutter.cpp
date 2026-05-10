@@ -19,19 +19,19 @@ nofWoodcutter::nofWoodcutter(const MapPoint pos, const unsigned char player, nob
 
 nofWoodcutter::nofWoodcutter(SerializedGameData& sgd, const unsigned obj_id) : nofFarmhand(sgd, obj_id) {}
 
-/// Malt den Arbeiter beim Arbeiten
+/// Draws the worker while working
 void nofWoodcutter::DrawWorking(DrawPoint drawPt)
 {
     unsigned short nowId = GAMECLIENT.Interpolate(118, current_ev);
 
     if(nowId < 10)
     {
-        // 1. Ein Stück vom Baum nach links laufen
+        // 1. Walk left a bit from the tree
         LOADER.getBobSprite(world->GetPlayer(player).nation, Job::Woodcutter, Direction::West, nowId % 8)
           .draw(drawPt - DrawPoint(nowId, 0), COLOR_WHITE, world->GetPlayer(player).color);
     } else if(nowId < 82)
     {
-        // 2. Hacken
+        // 2. Chop
         LOADER.GetPlayerImage("rom_bobs", 24 + (nowId - 10) % 8)
           ->DrawFull(drawPt - DrawPoint(9, 0), COLOR_WHITE, world->GetPlayer(player).color);
 
@@ -43,7 +43,7 @@ void nofWoodcutter::DrawWorking(DrawPoint drawPt)
 
     } else if(nowId < 105)
     {
-        // 3. Warten bis Baum umfällt
+        // 3. Wait until the tree falls
         LOADER.GetPlayerImage("rom_bobs", 24)
           ->DrawFull(drawPt - DrawPoint(9, 0), COLOR_WHITE, world->GetPlayer(player).color);
 
@@ -54,12 +54,12 @@ void nofWoodcutter::DrawWorking(DrawPoint drawPt)
         }
     } else if(nowId < 115)
     {
-        // 4. Wieder zurückgehen nach rechts
+        // 4. Walk back to the right
         LOADER.getBobSprite(world->GetPlayer(player).nation, Job::Woodcutter, Direction::East, (nowId - 105) % 8)
           .draw(drawPt - DrawPoint(9 - (nowId - 105), 0), COLOR_WHITE, world->GetPlayer(player).color);
     } else
     {
-        // 5. kurz am Baum warten (quasi Baumstamm in die Hand nehmen)
+        // 5. Wait briefly at the tree (essentially taking the log in hand)
         LOADER.getBobSprite(world->GetPlayer(player).nation, Job::Woodcutter, Direction::East, 1)
           .draw(drawPt, COLOR_WHITE, world->GetPlayer(player).color);
     }
@@ -70,7 +70,7 @@ unsigned short nofWoodcutter::GetCarryID() const
     return 61;
 }
 
-/// Abgeleitete Klasse informieren, wenn sie anfängt zu arbeiten (Vorbereitungen)
+/// Inform the derived class when it starts working (preparations)
 void nofWoodcutter::WorkStarted()
 {
     RTTR_Assert(world->GetSpecObj<noTree>(dest)->GetType() == NodalObjectType::Tree);
@@ -78,18 +78,18 @@ void nofWoodcutter::WorkStarted()
     world->GetSpecObj<noTree>(dest)->FallSoon();
 }
 
-/// Abgeleitete Klasse informieren, wenn fertig ist mit Arbeiten
+/// Inform the derived class when it has finished working
 void nofWoodcutter::WorkFinished()
 {
-    // Holz in die Hand nehmen
+    // Take the wood in hand
     ware = GoodType::Wood;
 }
 
 /// Returns the quality of this working point or determines if the worker can work here at all
 nofFarmhand::PointQuality nofWoodcutter::GetPointQuality(const MapPoint pt, bool /* isBeforeWork */) const
 {
-    // Gibt es hier an dieser Position einen Baum und ist dieser ausgewachsen?
-    // außerdem keine Ananas fällen!
+    // Is there a tree at this position and is it fully grown?
+    // Also do not chop down pineapple plants!
     const noBase* no = world->GetNO(pt);
     if(no->GetType() == NodalObjectType::Tree)
     {
@@ -103,7 +103,7 @@ nofFarmhand::PointQuality nofWoodcutter::GetPointQuality(const MapPoint pt, bool
 void nofWoodcutter::WorkAborted()
 {
     nofFarmhand::WorkAborted();
-    // Dem Baum Bescheid sagen
+    // Notify the tree
     if(state == State::Work)
         world->GetSpecObj<noTree>(pos)->DontFall();
 }

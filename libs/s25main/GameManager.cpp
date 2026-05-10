@@ -35,21 +35,21 @@ GameManager::GameManager(Log& log, Settings& settings, VideoDriverWrapper& video
 }
 
 /**
- *  Spiel starten
+ *  Start the game.
  */
 bool GameManager::Start()
 {
-    // Einstellungen laden
+    // Load settings
     settings_.Load();
 
-    /// Videotreiber laden
+    /// Load video driver
     if(!videoDriver_.LoadDriver(settings_.driver.video))
     {
         s25util::error(_("Video driver couldn't be loaded!"));
         return false;
     }
 
-    // Fenster erstellen
+    // Create window
     const auto screenSize =
       settings_.video.fullscreen ? settings_.video.fullscreenSize : settings_.video.windowedSize; //-V807
     if(!videoDriver_.CreateScreen(screenSize, settings_.video.fullscreen))
@@ -58,18 +58,18 @@ bool GameManager::Start()
     videoDriver_.SetMouseWarping(settings_.global.smartCursor);
     videoDriver_.setGuiScalePercent(settings_.video.guiScale);
 
-    /// Audiodriver laden
+    /// Load audio driver
     if(!audioDriver_.LoadDriver(settings_.driver.audio))
     {
         s25util::warning(_("Audio driver couldn't be loaded!"));
         // return false;
     }
 
-    /// Lautstärken gleich mit setzen
+    /// Set volumes right away
     audioDriver_.SetMasterEffectVolume(settings_.sound.effectsVolume); //-V807
     audioDriver_.SetMusicVolume(settings_.sound.musicVolume);
 
-    // Treibereinstellungen abspeichern
+    // Save driver settings
     settings_.Save();
 
     log_.write(_("\nStarting the game\n"));
@@ -77,26 +77,26 @@ bool GameManager::Start()
 }
 
 /**
- *  Spiel beenden.
+ *  Stop the game.
  */
 void GameManager::Stop()
 {
     GAMECLIENT.Stop();
     GAMESERVER.Stop();
     LOBBYCLIENT.Stop();
-    // Global Einstellungen speichern
+    // Save global settings
     settings_.Save();
 
-    // Fenster beenden
+    // Close window
     videoDriver_.DestroyScreen();
 }
 
 /**
- *  Hauptschleife.
+ *  Main loop.
  */
 bool GameManager::Run()
 {
-    // Nachrichtenschleife
+    // Message loop
     if(!videoDriver_.Run())
         GLOBALVARS.notdone = false;
 
@@ -152,7 +152,7 @@ bool GameManager::Run()
     }
     gfCounter_.update();
 
-    // Fenstermanager aufräumen
+    // Clean up window manager
     if(!GLOBALVARS.notdone)
         windowManager_.CleanUp();
 
@@ -175,7 +175,7 @@ bool GameManager::ShowSplashscreen()
 }
 
 /**
- *  zeigt das Hauptmenü.
+ *  Shows the main menu.
  */
 bool GameManager::ShowMenu()
 {
@@ -183,10 +183,10 @@ bool GameManager::ShowMenu()
     GAMESERVER.Stop();
 
     if(LOBBYCLIENT.IsLoggedIn())
-        // Lobby zeigen
+        // Show lobby
         windowManager_.Switch(std::make_unique<dskLobby>());
     else
-        // Hauptmenü zeigen
+        // Show main menu
         windowManager_.Switch(std::make_unique<dskMainMenu>());
 
     return true;
