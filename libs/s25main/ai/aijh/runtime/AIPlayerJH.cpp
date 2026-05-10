@@ -294,8 +294,9 @@ void AIPlayerJH::RunGF(const unsigned gf, bool gfisnwf)
         const ScopedAIRuntimeProfile tryToAttackProfile(AIRuntimeProfileSection::TryToAttack);
         TryToAttack();
     }
-    if(((gf + playerId * 17) % 73 == 0) && (level != AI::Level::Easy))
+    if((gf + playerId * 17) % 273 == 0)
     {
+        eventHandler_->UpdateMilitaryCoinSettings();
         // MilUpgradeOptim();
     }
 

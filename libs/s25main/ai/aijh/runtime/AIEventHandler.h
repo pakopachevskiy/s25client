@@ -28,6 +28,7 @@ public:
     explicit AIEventHandler(AIPlayerJH& owner) : owner_(owner) {}
 
     void ExecuteAIJob();
+    void UpdateMilitaryCoinSettings();
     void HandleNewMilitaryBuildingOccupied(MapPoint pt);
     void HandleBuildingDestroyed(MapPoint pt, BuildingType bld);
     void HandleRoadConstructionComplete(MapPoint pt, Direction dir);

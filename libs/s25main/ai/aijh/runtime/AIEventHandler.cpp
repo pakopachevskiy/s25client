@@ -52,6 +52,16 @@ void AIEventHandler::ExecuteAIJob()
     owner_.construction->ExecuteJobs(quota);
 }
 
+void AIEventHandler::UpdateMilitaryCoinSettings()
+{
+    for(const nobMilitary* mil : owner_.aii.GetMilitaryBuildings())
+    {
+        const bool shouldEnableCoins = mil->GetFrontierDistance() != FrontierDistance::Far;
+        if(mil->IsGoldDisabled() == shouldEnableCoins)
+            owner_.aii.SetCoinsAllowed(mil->GetPos(), shouldEnableCoins);
+    }
+}
+
 void AIEventHandler::HandleNewMilitaryBuildingOccupied(const MapPoint pt)
 {
     owner_.ForgetLostMilitaryBuilding(pt);
@@ -62,16 +72,9 @@ void AIEventHandler::HandleNewMilitaryBuildingOccupied(const MapPoint pt)
     if(!mil)
         return;
 
-    if(mil->GetFrontierDistance() != FrontierDistance::Far)
-    {
-        if(mil->IsGoldDisabled())
-            owner_.aii.SetCoinsAllowed(pt, true);
-    } else if((mil->GetBuildingType() == BuildingType::Barracks || mil->GetBuildingType() == BuildingType::Guardhouse)
-              && mil->GetBuildingType() != owner_.construction->GetBiggestAllowedMilBuilding())
-    {
-        if(!mil->IsGoldDisabled())
-            owner_.aii.SetCoinsAllowed(pt, false);
-    }
+    const bool shouldEnableCoins = mil->GetFrontierDistance() != FrontierDistance::Far;
+    if(mil->IsGoldDisabled() == shouldEnableCoins)
+        owner_.aii.SetCoinsAllowed(pt, shouldEnableCoins);
 
     owner_.AddBuildJob(BuildingType::HarborBuilding, pt);
     if(!owner_.IsInvalidShipyardPosition(pt))
