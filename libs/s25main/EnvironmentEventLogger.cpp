@@ -129,6 +129,12 @@ pb::EnvironmentLogRecord CreateRecord(unsigned gf, pb::EnvironmentEventType even
     return record;
 }
 
+unsigned GetRemainingGranite(const noGranite& granite)
+{
+    // noGranite stores remaining durability as raw state minus the final removable stone.
+    return static_cast<unsigned>(granite.GetSize()) + 1u;
+}
+
 void EnqueueRecord(unsigned gf, const GameWorldBase& world, pb::EnvironmentLogRecord&& record)
 {
     RememberHeaderInfo(world);
@@ -175,6 +181,8 @@ void LogInitialEnvironment(unsigned gf, const GameWorldBase& world)
                 const auto& granite = static_cast<const noGranite&>(*obj);
                 auto record = CreateRecord(gf, pb::ENVIRONMENT_EVENT_TYPE_GRANITE_INITIAL, pt);
                 record.set_granite_type(static_cast<unsigned>(granite.GetGraniteType()));
+                record.set_granite_size_before(GetRemainingGranite(granite));
+                record.set_granite_size_after(GetRemainingGranite(granite));
                 EnqueueRecord(gf, world, std::move(record));
             }
             break;

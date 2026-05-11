@@ -4,6 +4,8 @@
 
 #include "nofStonemason.h"
 
+#include "EnvironmentEventLogger.h"
+#include "EventManager.h"
 #include "GameInterface.h"
 #include "GamePlayer.h"
 #include "Loader.h"
@@ -46,9 +48,17 @@ void nofStonemason::WorkStarted() {}
 /// Notify derived class when work is finished
 void nofStonemason::WorkFinished()
 {
+    noGranite& granite = *world->GetSpecObj<noGranite>(pos);
+    const unsigned char sizeBefore = static_cast<unsigned char>(granite.GetSize() + 1u);
+    unsigned char sizeAfter;
+
     // Cut off one chunk of granite (if it is already minimal, remove it from the map)
-    if(world->GetSpecObj<noGranite>(pos)->IsSmall())
+    if(granite.IsSmall())
     {
+        sizeAfter = 0;
+        EnvironmentEventLogger::LogGraniteHew(world->GetEvMgr().GetCurrentGF(), *world, pos, granite, sizeBefore,
+                                              sizeAfter);
+
         // Remove the granite chunk
         world->DestroyNO(pos);
 
@@ -59,8 +69,13 @@ void nofStonemason::WorkFinished()
         // Recalculate nearby BQ, as it may have changed now
         world->RecalcBQAroundPoint(pos);
     } else
+    {
         // Otherwise decrease size by 1
-        world->GetSpecObj<noGranite>(pos)->Hew();
+        granite.Hew();
+        sizeAfter = static_cast<unsigned char>(granite.GetSize() + 1u);
+        EnvironmentEventLogger::LogGraniteHew(world->GetEvMgr().GetCurrentGF(), *world, pos, granite, sizeBefore,
+                                              sizeAfter);
+    }
 
     // Pick up a stone
     ware = GoodType::Stones;

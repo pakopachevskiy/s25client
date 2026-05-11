@@ -141,6 +141,12 @@ platform support, and optional sanitizers for development builds.
 - [Building and site rendering](development/building-and-construction-site-rendering.md)
   – How finished building sprites, construction progress, and fog-of-war
   building memories are drawn.
+- [Tree and granite rendering](development/tree-and-granite-rendering.md) –
+  How functional environment-object sprites, animation state, fog memories,
+  and minimap markers are drawn.
+- [Granite size calculation](development/granite-size-calculation.md) – How
+  granite raw durability, boosted state, visual size, and event-log sizes are
+  derived.
 - [AI battle startup arguments](tools/ai-battle.md) – Headless AI simulation
   CLI options, outputs, stats periods, and event logger controls.
 - [Data extractor](tools/data-extractor.md) – Snapshot generation and exported
