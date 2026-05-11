@@ -7,6 +7,7 @@
 #include "BuildingEventLogger.h"
 #include "CountryEventLogger.h"
 #include "CountryPlotEventLogger.h"
+#include "EnvironmentEventLogger.h"
 #include "EventManager.h"
 #include "GamePlayer.h"
 #include "GameWorldBase.h"
@@ -57,6 +58,8 @@ bool MapLoader::Load(const libsiedler2::ArchivItem_Map& map, Exploration explora
     if(!InitNodes(map, exploration))
         return false;
     PlaceObjects(map);
+    if(world_.GetEvMgr().GetCurrentGF() == 0)
+        EnvironmentEventLogger::LogInitialEnvironment(0, world_);
     PlaceAnimals(map);
     if(!InitSeasAndHarbors(world_))
         return false;

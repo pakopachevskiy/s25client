@@ -54,6 +54,7 @@ set(s25Main_SRCS
         CombatLossTracker.cpp
         CountryEventLogger.cpp
         CountryPlotEventLogger.cpp
+        EnvironmentEventLogger.cpp
         MilitaryEventLogger.cpp
         RoadEventLogger.cpp
         MilitaryStatsHolder.cpp
@@ -106,6 +107,11 @@ set(ROAD_LOG_PROTO ${PROJECT_SOURCE_DIR}/external/proto-repo/road_log.proto)
 protobuf_generate_cpp(ROAD_LOG_PROTO_SRCS ROAD_LOG_PROTO_HDRS ${ROAD_LOG_PROTO})
 set_source_files_properties(${ROAD_LOG_PROTO_SRCS} PROPERTIES COMPILE_OPTIONS "-Wno-missing-declarations")
 list(APPEND s25Main_SRCS ${ROAD_LOG_PROTO_SRCS} ${ROAD_LOG_PROTO_HDRS})
+
+set(ENVIRONMENT_LOG_PROTO ${PROJECT_SOURCE_DIR}/external/proto-repo/environment_log.proto)
+protobuf_generate_cpp(ENVIRONMENT_LOG_PROTO_SRCS ENVIRONMENT_LOG_PROTO_HDRS ${ENVIRONMENT_LOG_PROTO})
+set_source_files_properties(${ENVIRONMENT_LOG_PROTO_SRCS} PROPERTIES COMPILE_OPTIONS "-Wno-missing-declarations")
+list(APPEND s25Main_SRCS ${ENVIRONMENT_LOG_PROTO_SRCS} ${ENVIRONMENT_LOG_PROTO_HDRS})
 
 add_library(s25Main STATIC ${s25Main_SRCS})
 

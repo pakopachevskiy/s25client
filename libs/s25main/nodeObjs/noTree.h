@@ -85,6 +85,7 @@ public:
     std::unique_ptr<FOWObject> CreateFOWObject() const override;
     /// Can this tree(type) produce wood?
     bool ProducesWood() const { return type != 5; }
+    unsigned char GetTreeType() const { return type; }
     /// Return if this tree is fully grown
     bool IsFullyGrown() const { return size == 3; }
 

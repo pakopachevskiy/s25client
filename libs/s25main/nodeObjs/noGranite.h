@@ -44,6 +44,7 @@ public:
 
     /// Return the size of this pile.
     unsigned char GetSize() const { return state & RAW_STATE_MASK; }
+    GraniteType GetGraniteType() const { return type; }
 
     /// Return visual size index in range [0, 5] used for rendering.
     unsigned char GetVisualSize() const;
