@@ -71,7 +71,14 @@ Behaviour driven by these knobs is documented in:
   when the global position finder evaluates nearby plot degradation during
   building-location search. The default is `0.05`.
 - `bqPenalty.roadRoute` – Multiplier applied to the road-route building-quality
-  downgrade penalty during road candidate scoring. The default is `1.0`.
+  downgrade penalty during road candidate scoring. This route penalty includes
+  both the hypothetical road and the interior flags the AI will try to add to
+  that road. The default is `1.0`.
+- `bqPenalty.roadRouteQualityValues` – Per-`BuildingQuality` values used to
+  price route-caused downgrades. A downgrade costs
+  `beforeQualityValue - afterQualityValue` when positive. Defaults include
+  `Flag: 0.5`, `Hut: 2.0`, `Castle: 7.0`, so `Flag -> Nothing` costs `0.5`
+  and `Castle -> Hut` costs `5.0`.
 - `reserveMilitaryBorderSlots` – When `true`, non-military position finding
   rejects near-border plots that could host a military building. The default is
   `true`.
@@ -93,7 +100,7 @@ following top-level sections if present:
 | `toolPriority`  | Map of tool names to signed priority values (e.g. `Tongs: 2`). Missing entries keep defaults. |
 | `troopsDistribution` | Optional map containing `strategy` (`Fair` or `ProtectedBuildingValue`) and `frontierMultipliers` (`Far`, `Mid`, `Harbor`, `Near`). |
 | `distributionAdjuster` | Map of distributed goods to target buildings. Each `distributedGood -> building` node may define `overstockingPenalty` as a map of stock goods to `BuildParams`. |
-| `bqPenalty` | Map with `buildLocation` and `roadRoute` scalars controlling BQ-related penalties in site and road scoring. |
+| `bqPenalty` | Map with `buildLocation`, `roadRoute`, and `roadRouteQualityValues` controlling BQ-related penalties in site and road scoring. |
 | `reserveMilitaryBorderSlots` | Boolean toggle for preserving border plots that are suitable for military expansion from non-military placement. |
 | `reserveMilitaryBorderlandThreshold` | Unsigned cutoff for `AIResource::Borderland`; plots above this level are treated as border-adjacent for the reservation rule. |
 
@@ -122,6 +129,17 @@ distributionAdjuster:
         Coal:
           min: 35
           linear: -0.04
+
+bqPenalty:
+  roadRoute: 1.0
+  roadRouteQualityValues:
+    Nothing: 0.0
+    Flag: 0.5
+    Hut: 2.0
+    House: 3.0
+    Mine: 3.0
+    Castle: 7.0
+    Harbor: 7.0
 ```
 
 With these settings:
@@ -139,7 +157,9 @@ With these settings:
 - `bqPenalty.buildLocation` defaults to `0.05` for adjacent-plot degradation
   when scoring building sites.
 - `bqPenalty.roadRoute` defaults to `1.0`, which matches the current built-in
-  route scoring weight for one building-quality downgrade level.
+  route scoring weight for the configured route downgrade cost.
+- `bqPenalty.roadRouteQualityValues` defaults to `Nothing: 0.0`, `Flag: 0.5`,
+  `Hut: 2.0`, `House: 3.0`, `Mine: 3.0`, `Castle: 7.0`, and `Harbor: 7.0`.
 - `troopsDistribution.strategy` defaults to `Fair`.
 - `troopsDistribution.frontierMultipliers` defaults to `1.0` for every
   frontier distance.

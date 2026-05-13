@@ -127,8 +127,16 @@ Where:
 - `maxNonFlaggableRun` is the longest consecutive stretch of
   `BuildingQuality::Nothing` along the new route,
 - `routeBQPenalty` is the summed downgrade cost caused by the hypothetical road
-  reducing building quality on route tiles and their nearby affected plots,
+  reducing building quality on route tiles and their nearby affected plots. For
+  each affected plot this is `beforeQualityValue - afterQualityValue` when the
+  configured value decreases, otherwise `0`. The estimate also includes
+  interior flags that the AI will try to place along the new road after
+  construction, because those flags can further reduce nearby plot quality,
 - `bqPenalty.roadRoute` comes from `AIConfig` and defaults to `1.0`.
+
+The quality values used by `routeBQPenalty` come from
+`bqPenalty.roadRouteQualityValues`. Defaults make a `Flag -> Nothing`
+downgrade cost `0.5`, while a `Castle -> Hut` downgrade costs `5.0`.
 
 The doubled weight on `newRoadLength` means the AI prefers short new
 construction even when the total end-to-end route would be similar either way,

@@ -5,6 +5,7 @@
 #include "AIQueryService.h"
 
 #include "EventManager.h"
+#include "ai/aijh/config/AIConfig.h"
 #include "buildings/noBaseBuilding.h"
 #include "buildings/noBuildingSite.h"
 #include "buildings/nobHQ.h"
@@ -24,6 +25,7 @@
 #include <limits>
 #include <numeric>
 #include <set>
+#include <utility>
 
 namespace {
 
@@ -95,6 +97,132 @@ unsigned GetBuildingQualityPenalty(BuildingQuality before, BuildingQuality after
     const unsigned beforeValue = GetBuildingQualityPenaltyValue(before);
     const unsigned afterValue = GetBuildingQualityPenaltyValue(after);
     return (beforeValue > afterValue) ? (beforeValue - afterValue) : 0;
+}
+
+double GetBuildingQualityPenalty(BuildingQuality before, BuildingQuality after, const BQPenaltyConfig& config)
+{
+    const double beforeValue = config.roadRouteQualityValues[before];
+    const double afterValue = config.roadRouteQualityValues[after];
+    return (beforeValue > afterValue) ? (beforeValue - afterValue) : 0.0;
+}
+
+struct RoadRouteBQPoints
+{
+    std::vector<std::pair<MapPoint, RoadDir>> routeRoads;
+    std::set<MapPoint, MapPointLess> roadBQAffectedPoints;
+    std::vector<MapPoint> routePointsInOrder;
+    std::set<MapPoint, MapPointLess> futureFlagPoints;
+    std::set<MapPoint, MapPointLess> affectedPoints;
+    bool hasNewRoadSegment = false;
+};
+
+RoadRouteBQPoints CollectRoadRouteBQPoints(const GameWorldBase& gwb, MapPoint start,
+                                           const std::vector<Direction>& route)
+{
+    RoadRouteBQPoints points;
+
+    auto addAffectedPoint = [&](MapPoint pt) {
+        auto addRoadBQAffectedPoint = [&](MapPoint affectedPt) {
+            points.roadBQAffectedPoints.insert(affectedPt);
+            points.affectedPoints.insert(affectedPt);
+        };
+        addRoadBQAffectedPoint(pt);
+        addRoadBQAffectedPoint(gwb.GetNeighbour(pt, Direction::East));
+        addRoadBQAffectedPoint(gwb.GetNeighbour(pt, Direction::SouthEast));
+        addRoadBQAffectedPoint(gwb.GetNeighbour(pt, Direction::SouthWest));
+    };
+
+    addAffectedPoint(start);
+    points.routePointsInOrder.push_back(start);
+    for(const Direction dir : route)
+    {
+        MapPoint roadPt = start;
+        const RoadDir roadDir = gwb.toRoadDir(roadPt, dir);
+        points.routeRoads.emplace_back(roadPt, roadDir);
+        points.hasNewRoadSegment = points.hasNewRoadSegment || gwb.GetPointRoad(start, dir) == PointRoad::None;
+        start = gwb.GetNeighbour(start, dir);
+        addAffectedPoint(start);
+        points.routePointsInOrder.push_back(start);
+    }
+
+    return points;
+}
+
+bool IsOnHypotheticalRoad(const GameWorldBase& gwb, const MapPoint pt,
+                          const std::vector<std::pair<MapPoint, RoadDir>>& routeRoads)
+{
+    if(gwb.IsOnRoad(pt))
+        return true;
+
+    for(const auto& routeRoad : routeRoads)
+    {
+        if(routeRoad.first == pt)
+            return true;
+        if(gwb.GetNeighbour(pt, getOppositeDir(routeRoad.second)) == routeRoad.first)
+            return true;
+    }
+
+    return false;
+}
+
+bool IsHypotheticalFlag(const GameWorldBase& gwb, const MapPoint pt,
+                        const std::set<MapPoint, MapPointLess>& futureFlagPoints)
+{
+    return futureFlagPoints.count(pt) > 0 || gwb.GetNO(pt)->GetBM() == BlockingManner::Flag;
+}
+
+bool IsHypotheticalFlagAround(const GameWorldBase& gwb, const MapPoint pt,
+                              const std::set<MapPoint, MapPointLess>& futureFlagPoints)
+{
+    for(const MapPoint nb : gwb.GetNeighbours(pt))
+    {
+        if(IsHypotheticalFlag(gwb, nb, futureFlagPoints))
+            return true;
+    }
+    return false;
+}
+
+template<class T_IsOnHypotheticalRoad>
+BuildingQuality GetHypotheticalBQ(const GameWorldBase& gwb, const BQCalculator& bqCalculator,
+                                  const unsigned char playerId, const MapPoint pt,
+                                  const T_IsOnHypotheticalRoad& isOnHypotheticalRoad,
+                                  const std::set<MapPoint, MapPointLess>& futureFlagPoints)
+{
+    const auto getBlockingManner = [&](MapPoint bmPt) {
+        return futureFlagPoints.count(bmPt) > 0 ? BlockingManner::Flag : gwb.GetNO(bmPt)->GetBM();
+    };
+    const BuildingQuality nodeBQ = bqCalculator(pt, isOnHypotheticalRoad, getBlockingManner, false);
+    return gwb.AdjustBQ(pt, playerId, nodeBQ);
+}
+
+void AddFutureFlagAffectedPoints(const GameWorldBase& gwb, const MapPoint flagPt,
+                                 std::set<MapPoint, MapPointLess>& affectedPoints)
+{
+    for(const MapPoint pt : gwb.GetPointsInRadiusWithCenter(flagPt, 2))
+        affectedPoints.insert(pt);
+}
+
+template<class T_IsOnHypotheticalRoad>
+void AddFutureRoadFlags(const GameWorldBase& gwb, const BQCalculator& bqCalculator, const unsigned char playerId,
+                        const T_IsOnHypotheticalRoad& isOnHypotheticalRoad, RoadRouteBQPoints& points)
+{
+    if(!points.hasNewRoadSegment || points.routePointsInOrder.size() < 5)
+        return;
+
+    for(size_t i = 2; i + 2 < points.routePointsInOrder.size(); ++i)
+    {
+        const MapPoint flagPt = points.routePointsInOrder[i];
+        if(IsHypotheticalFlagAround(gwb, flagPt, points.futureFlagPoints))
+            continue;
+
+        const BuildingQuality afterBQ =
+          GetHypotheticalBQ(gwb, bqCalculator, playerId, flagPt, isOnHypotheticalRoad, points.futureFlagPoints);
+        if(afterBQ != BuildingQuality::Nothing)
+        {
+            points.futureFlagPoints.insert(flagPt);
+            AddFutureFlagAffectedPoints(gwb, flagPt, points.affectedPoints);
+        }
+    }
 }
 } // namespace
 
@@ -412,34 +540,47 @@ unsigned AIQueryService::EstimateRoadRouteBQPenalty(MapPoint start, const std::v
     if(route.empty())
         return 0;
 
-    std::set<MapPoint, MapPointLess> routePoints;
-    std::set<MapPoint, MapPointLess> affectedPoints;
-
-    auto addAffectedPoint = [&](MapPoint pt) {
-        routePoints.insert(pt);
-        affectedPoints.insert(pt);
-        affectedPoints.insert(gwb.GetNeighbour(pt, Direction::East));
-        affectedPoints.insert(gwb.GetNeighbour(pt, Direction::SouthEast));
-        affectedPoints.insert(gwb.GetNeighbour(pt, Direction::SouthWest));
-    };
-
-    addAffectedPoint(start);
-    for(const Direction dir : route)
-    {
-        start = gwb.GetNeighbour(start, dir);
-        addAffectedPoint(start);
-    }
+    RoadRouteBQPoints points = CollectRoadRouteBQPoints(gwb, start, route);
 
     const BQCalculator bqCalculator(gwb);
-    const auto isOnHypotheticalRoad = [&](MapPoint pt) { return gwb.IsOnRoad(pt) || routePoints.count(pt) > 0; };
+    const auto isOnHypotheticalRoad = [&](MapPoint pt) {
+        return IsOnHypotheticalRoad(gwb, pt, points.routeRoads);
+    };
+    AddFutureRoadFlags(gwb, bqCalculator, playerID_, isOnHypotheticalRoad, points);
 
     unsigned penalty = 0;
-    for(const MapPoint pt : affectedPoints)
+    for(const MapPoint pt : points.affectedPoints)
     {
         const BuildingQuality beforeBQ = gwb.GetBQ(pt, playerID_);
-        const BuildingQuality afterNodeBQ = bqCalculator(pt, isOnHypotheticalRoad);
-        const BuildingQuality afterBQ = gwb.AdjustBQ(pt, playerID_, afterNodeBQ);
+        const BuildingQuality afterBQ =
+          GetHypotheticalBQ(gwb, bqCalculator, playerID_, pt, isOnHypotheticalRoad, points.futureFlagPoints);
         penalty += GetBuildingQualityPenalty(beforeBQ, afterBQ);
+    }
+
+    return penalty;
+}
+
+double AIQueryService::EstimateRoadRouteBQPenalty(MapPoint start, const std::vector<Direction>& route,
+                                                  const BQPenaltyConfig& bqPenalty) const
+{
+    if(route.empty())
+        return 0.0;
+
+    RoadRouteBQPoints points = CollectRoadRouteBQPoints(gwb, start, route);
+
+    const BQCalculator bqCalculator(gwb);
+    const auto isOnHypotheticalRoad = [&](MapPoint pt) {
+        return IsOnHypotheticalRoad(gwb, pt, points.routeRoads);
+    };
+    AddFutureRoadFlags(gwb, bqCalculator, playerID_, isOnHypotheticalRoad, points);
+
+    double penalty = 0.0;
+    for(const MapPoint pt : points.affectedPoints)
+    {
+        const BuildingQuality beforeBQ = gwb.GetBQ(pt, playerID_);
+        const BuildingQuality afterBQ =
+          GetHypotheticalBQ(gwb, bqCalculator, playerID_, pt, isOnHypotheticalRoad, points.futureFlagPoints);
+        penalty += GetBuildingQualityPenalty(beforeBQ, afterBQ, bqPenalty);
     }
 
     return penalty;

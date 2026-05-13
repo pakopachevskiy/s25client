@@ -372,7 +372,8 @@ bool AIConstruction::ConnectFlagToRoadSytem(const noFlag* flag, std::vector<Dire
     const noFlag* shortest = nullptr;
     double shortestLength = std::numeric_limits<double>::infinity();
     std::vector<Direction> tmpRoute;
-    const double roadRouteBQPenalty = aijh.GetConfig().bqPenalty.roadRoute;
+    const auto& bqPenaltyConfig = aijh.GetConfig().bqPenalty;
+    const double roadRouteBQPenalty = bqPenaltyConfig.roadRoute;
 
     // Test each flag...
     for(const noFlag* curFlag : flags)
@@ -423,8 +424,10 @@ bool AIConstruction::ConnectFlagToRoadSytem(const noFlag* flag, std::vector<Dire
             continue;
 
         unsigned odd = length % 2 != 0 ? 5 : 0;
-        const unsigned bqPenalty =
-          (roadRouteBQPenalty > 0.0) ? aii.Queries().EstimateRoadRouteBQPenalty(flag->GetPos(), tmpRoute) : 0u;
+        const double bqPenalty = (roadRouteBQPenalty > 0.0)
+                                   ? aii.Queries().EstimateRoadRouteBQPenalty(flag->GetPos(), tmpRoute,
+                                                                              bqPenaltyConfig)
+                                   : 0.0;
         const double score =
           odd + 2 * length + distance + 10 * maxNonFlagPts + roadRouteBQPenalty * bqPenalty;
         // Shorter than the last one? Take it! Weight the new build segment higher (2) so
@@ -689,7 +692,8 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
     // Collect nearby flags
     std::vector<const noFlag*> flags = FindFlags(flag->GetPos(), maxRoadLength);
     std::vector<Direction> mainroad = route;
-    const double roadRouteBQPenalty = aijh.GetConfig().bqPenalty.roadRoute;
+    const auto& bqPenaltyConfig = aijh.GetConfig().bqPenalty;
+    const double roadRouteBQPenalty = bqPenaltyConfig.roadRoute;
     // targetflag for mainroad
     MapPoint t = flag->GetPos();
     for(auto i : mainroad)
@@ -765,8 +769,9 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
             continue;
 
         // Is the road worth it?
-        const unsigned bqPenalty =
-          (roadRouteBQPenalty > 0.0) ? aii.Queries().EstimateRoadRouteBQPenalty(flag->GetPos(), route) : 0u;
+        const double bqPenalty = (roadRouteBQPenalty > 0.0)
+                                   ? aii.Queries().EstimateRoadRouteBQPenalty(flag->GetPos(), route, bqPenaltyConfig)
+                                   : 0.0;
         const double effectiveNewLength = newLength * lengthFactor + roadRouteBQPenalty * bqPenalty;
         if(!pathAvailable || effectiveNewLength < oldLength)
         {

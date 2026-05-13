@@ -6,6 +6,7 @@
 #include "PointOutput.h"
 #include "RttrForeachPt.h"
 #include "ai/AIQueryService.h"
+#include "ai/aijh/config/AIConfig.h"
 #include "buildings/nobBaseMilitary.h"
 #include "desktops/dskGameInterface.h"
 #include "helpers/containerUtils.h"
@@ -252,6 +253,66 @@ BOOST_FIXTURE_TEST_CASE(EstimateRoadRouteBQPenalty_IsLowerNearExistingRoads, Emp
     BOOST_TEST(nearPenalty > 0u);
     BOOST_TEST(pristinePenalty > 0u);
     BOOST_TEST(nearPenalty < pristinePenalty);
+}
+
+BOOST_FIXTURE_TEST_CASE(EstimateRoadRouteBQPenalty_IncludesFutureRoadFlags, EmptyWorldFixture1PBiggest)
+{
+    RTTR_FOREACH_PT(MapPoint, world.GetSize())
+        world.SetOwner(pt, 1);
+
+    const MapPoint start(12, 3);
+    const std::vector<Direction> route(6, Direction::SouthEast);
+    MapPoint end = start;
+    for(const Direction dir : route)
+        end = world.GetNeighbour(end, dir);
+
+    world.SetFlag(start, 0);
+    world.SetFlag(end, 0);
+    BOOST_TEST_REQUIRE(static_cast<int>(world.GetNO(start)->GetBM()) == static_cast<int>(BlockingManner::Flag));
+    BOOST_TEST_REQUIRE(static_cast<int>(world.GetNO(end)->GetBM()) == static_cast<int>(BlockingManner::Flag));
+
+    AIConfig config;
+    const AIQueryService queries(world, 0);
+    const double estimatedPenalty = queries.EstimateRoadRouteBQPenalty(start, route, config.bqPenalty);
+
+    std::vector<BuildingQuality> beforeBQs;
+    RTTR_FOREACH_PT(MapPoint, world.GetSize())
+        beforeBQs.push_back(world.GetBQ(pt, 0));
+
+    world.BuildRoad(0, false, start, route);
+
+    double roadOnlyPenalty = 0.0;
+    unsigned roadOnlyIdx = 0;
+    RTTR_FOREACH_PT(MapPoint, world.GetSize())
+    {
+        const double beforeValue = config.bqPenalty.roadRouteQualityValues[beforeBQs[roadOnlyIdx]];
+        const double afterValue = config.bqPenalty.roadRouteQualityValues[world.GetBQ(pt, 0)];
+        if(beforeValue > afterValue)
+            roadOnlyPenalty += beforeValue - afterValue;
+        ++roadOnlyIdx;
+    }
+
+    MapPoint curPt = world.GetNeighbour(start, route.front());
+    for(unsigned i = 1; i + 2 < route.size(); ++i)
+    {
+        curPt = world.GetNeighbour(curPt, route[i]);
+        world.SetFlag(curPt, 0);
+    }
+
+    double actualPenalty = 0.0;
+    unsigned idx = 0;
+    RTTR_FOREACH_PT(MapPoint, world.GetSize())
+    {
+        const double beforeValue = config.bqPenalty.roadRouteQualityValues[beforeBQs[idx]];
+        const double afterValue = config.bqPenalty.roadRouteQualityValues[world.GetBQ(pt, 0)];
+        if(beforeValue > afterValue)
+            actualPenalty += beforeValue - afterValue;
+        ++idx;
+    }
+
+    BOOST_TEST(estimatedPenalty > roadOnlyPenalty);
+    BOOST_TEST(actualPenalty > roadOnlyPenalty);
+    BOOST_TEST(actualPenalty > 0.0);
 }
 
 BOOST_FIXTURE_TEST_CASE(EstimateBuildLocationBQPenalty_MatchesActualAdjacentBQLoss, EmptyWorldFixture1PBiggest)

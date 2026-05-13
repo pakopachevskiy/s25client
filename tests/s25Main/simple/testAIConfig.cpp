@@ -16,6 +16,37 @@ BOOST_AUTO_TEST_CASE(TroopsDistributionStrategy_DefaultsToFair)
                == static_cast<int>(TroopsDistributionStrategy::Fair));
 }
 
+BOOST_AUTO_TEST_CASE(BQPenaltyConfig_DefaultRoadRouteQualityValues)
+{
+    const AIConfig config;
+    const auto& values = config.bqPenalty.roadRouteQualityValues;
+
+    BOOST_TEST(values[BuildingQuality::Flag] - values[BuildingQuality::Nothing] == 0.5);
+    BOOST_TEST(values[BuildingQuality::Castle] - values[BuildingQuality::Hut] == 5.0);
+}
+
+BOOST_AUTO_TEST_CASE(BQPenaltyConfig_RoadRouteQualityValuesCanBeParsed)
+{
+    const std::string configPath = "/tmp/rttr-ai-bq-penalty.yaml";
+    {
+        std::ofstream out(configPath);
+        BOOST_TEST_REQUIRE(out.good());
+        out << "bqPenalty:\n";
+        out << "  roadRoute: 1.25\n";
+        out << "  roadRouteQualityValues:\n";
+        out << "    Flag: 0.75\n";
+        out << "    Castle: 9.0\n";
+    }
+
+    AIConfig config;
+    applyWeightsCfg(configPath, config);
+
+    BOOST_TEST(config.bqPenalty.roadRoute == 1.25);
+    BOOST_TEST(config.bqPenalty.roadRouteQualityValues[BuildingQuality::Flag] == 0.75);
+    BOOST_TEST(config.bqPenalty.roadRouteQualityValues[BuildingQuality::Castle] == 9.0);
+    BOOST_TEST(config.bqPenalty.roadRouteQualityValues[BuildingQuality::Hut] == 2.0);
+}
+
 BOOST_AUTO_TEST_CASE(TroopsDistributionStrategy_CanBeParsed)
 {
     const std::string configPath = "/tmp/rttr-ai-troops-distribution-strategy.yaml";

@@ -26,6 +26,7 @@ class nobHQ;
 class nobHarborBuilding;
 class nobMilitary;
 class nobUsual;
+struct BQPenaltyConfig;
 
 class AIQueryService
 {
@@ -62,6 +63,8 @@ public:
     bool IsReservedMilitaryBorderSlot(MapPoint pt, BuildingQuality currentBQ) const;
     unsigned EstimateBuildLocationBQPenalty(MapPoint buildingPos) const;
     unsigned EstimateRoadRouteBQPenalty(MapPoint start, const std::vector<Direction>& route) const;
+    double EstimateRoadRouteBQPenalty(MapPoint start, const std::vector<Direction>& route,
+                                      const BQPenaltyConfig& bqPenalty) const;
     bool FindFreePathForNewRoad(MapPoint start, MapPoint target, std::vector<Direction>* route = nullptr,
                                 unsigned* length = nullptr) const;
     bool FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr) const;

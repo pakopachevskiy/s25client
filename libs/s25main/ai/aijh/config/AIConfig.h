@@ -4,6 +4,7 @@
 #include "buildings/nobMilitary.h"
 #include "helpers/EnumArray.h"
 #include "gameTypes/AIInfo.h"
+#include "gameTypes/BuildingQuality.h"
 #include "gameTypes/BuildingType.h"
 #include "gameTypes/GoodTypes.h"
 #include "gameData/ToolConsts.h"
@@ -43,8 +44,11 @@ struct DistributionParams
 
 struct BQPenaltyConfig
 {
+    BQPenaltyConfig();
+
     double buildLocation = 0.05;
     double roadRoute = 1.0;
+    helpers::EnumArray<double, BuildingQuality> roadRouteQualityValues;
 };
 
 struct TroopsDistributionConfig

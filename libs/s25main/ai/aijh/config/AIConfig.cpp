@@ -20,6 +20,17 @@
 // Define the global instance
 AIConfig AI_CONFIG;
 
+BQPenaltyConfig::BQPenaltyConfig()
+{
+    roadRouteQualityValues[BuildingQuality::Nothing] = 0.0;
+    roadRouteQualityValues[BuildingQuality::Flag] = 0.5;
+    roadRouteQualityValues[BuildingQuality::Mine] = 3.0;
+    roadRouteQualityValues[BuildingQuality::Hut] = 2.0;
+    roadRouteQualityValues[BuildingQuality::House] = 4.0;
+    roadRouteQualityValues[BuildingQuality::Castle] = 7.0;
+    roadRouteQualityValues[BuildingQuality::Harbor] = 7.0;
+}
+
 TroopsDistributionConfig::TroopsDistributionConfig()
 {
     for(const auto frontierDistance : helpers::enumRange<FrontierDistance>())
@@ -532,6 +543,64 @@ void applyDistributionAdjusterCfg(const YAML::Node& distributionNode, AIConfig& 
     }
 }
 
+bool parseBuildingQualityName(const std::string& name, BuildingQuality& bq)
+{
+    if(name == "Nothing")
+        bq = BuildingQuality::Nothing;
+    else if(name == "Flag")
+        bq = BuildingQuality::Flag;
+    else if(name == "Mine")
+        bq = BuildingQuality::Mine;
+    else if(name == "Hut")
+        bq = BuildingQuality::Hut;
+    else if(name == "House")
+        bq = BuildingQuality::House;
+    else if(name == "Castle")
+        bq = BuildingQuality::Castle;
+    else if(name == "Harbor")
+        bq = BuildingQuality::Harbor;
+    else
+        return false;
+
+    return true;
+}
+
+void applyRoadRouteQualityValuesCfg(const YAML::Node& qualityValuesNode, AIConfig& config)
+{
+    if(!qualityValuesNode)
+        return;
+
+    if(!qualityValuesNode.IsMap())
+    {
+        std::cerr << "Warning: bqPenalty.roadRouteQualityValues must be a map." << std::endl;
+        return;
+    }
+
+    for(const auto& valueNode : qualityValuesNode)
+    {
+        try
+        {
+            const std::string qualityName = valueNode.first.as<std::string>();
+            BuildingQuality bq;
+            if(!parseBuildingQualityName(qualityName, bq))
+            {
+                std::cerr << "Warning: Unknown building quality '" << qualityName
+                          << "' in bqPenalty.roadRouteQualityValues map." << std::endl;
+                continue;
+            }
+            config.bqPenalty.roadRouteQualityValues[bq] = valueNode.second.as<double>();
+        } catch(const YAML::TypedBadConversion<std::string>& e)
+        {
+            std::cerr << "Warning: Invalid bqPenalty.roadRouteQualityValues key, skipping. Error: " << e.what()
+                      << std::endl;
+        } catch(const YAML::TypedBadConversion<double>& e)
+        {
+            std::cerr << "Warning: Invalid bqPenalty.roadRouteQualityValues value, skipping. Error: " << e.what()
+                      << std::endl;
+        }
+    }
+}
+
 void applyBQPenaltyCfg(const YAML::Node& bqPenaltyNode, AIConfig& config)
 {
     if(!bqPenaltyNode)
@@ -589,6 +658,8 @@ void applyBQPenaltyCfg(const YAML::Node& bqPenaltyNode, AIConfig& config)
                       << std::endl;
         }
     }
+
+    applyRoadRouteQualityValuesCfg(bqPenaltyNode["roadRouteQualityValues"], config);
 }
 } // namespace
 
