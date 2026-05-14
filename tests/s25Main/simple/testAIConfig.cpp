@@ -23,6 +23,9 @@ BOOST_AUTO_TEST_CASE(BQPenaltyConfig_DefaultRoadRouteQualityValues)
 
     BOOST_TEST(values[BuildingQuality::Flag] - values[BuildingQuality::Nothing] == 0.5);
     BOOST_TEST(values[BuildingQuality::Castle] - values[BuildingQuality::Hut] == 5.0);
+    BOOST_TEST(config.bqPenalty.roadRouteWeightedSearch);
+    BOOST_TEST(config.bqPenalty.roadRouteWeightedRefinementTopN == 3u);
+    BOOST_TEST(config.bqPenalty.roadRouteWeightedRefinementScoreMargin == 25.0);
 }
 
 BOOST_AUTO_TEST_CASE(BQPenaltyConfig_RoadRouteQualityValuesCanBeParsed)
@@ -33,6 +36,9 @@ BOOST_AUTO_TEST_CASE(BQPenaltyConfig_RoadRouteQualityValuesCanBeParsed)
         BOOST_TEST_REQUIRE(out.good());
         out << "bqPenalty:\n";
         out << "  roadRoute: 1.25\n";
+        out << "  roadRouteWeightedSearch: false\n";
+        out << "  roadRouteWeightedRefinementTopN: 5\n";
+        out << "  roadRouteWeightedRefinementScoreMargin: 12.5\n";
         out << "  roadRouteQualityValues:\n";
         out << "    Flag: 0.75\n";
         out << "    Castle: 9.0\n";
@@ -42,6 +48,9 @@ BOOST_AUTO_TEST_CASE(BQPenaltyConfig_RoadRouteQualityValuesCanBeParsed)
     applyWeightsCfg(configPath, config);
 
     BOOST_TEST(config.bqPenalty.roadRoute == 1.25);
+    BOOST_TEST(!config.bqPenalty.roadRouteWeightedSearch);
+    BOOST_TEST(config.bqPenalty.roadRouteWeightedRefinementTopN == 5u);
+    BOOST_TEST(config.bqPenalty.roadRouteWeightedRefinementScoreMargin == 12.5);
     BOOST_TEST(config.bqPenalty.roadRouteQualityValues[BuildingQuality::Flag] == 0.75);
     BOOST_TEST(config.bqPenalty.roadRouteQualityValues[BuildingQuality::Castle] == 9.0);
     BOOST_TEST(config.bqPenalty.roadRouteQualityValues[BuildingQuality::Hut] == 2.0);

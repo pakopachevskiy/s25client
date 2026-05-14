@@ -10,6 +10,8 @@
 #include "pathfinding/PathfindingPoint.h"
 #include "world/GameWorldBase.h"
 #include "s25util/Log.h"
+#include <cmath>
+#include <queue>
 
 //////////////////////////////////////////////////////////////////////////
 /// FreePathFinder implementation
@@ -20,6 +22,62 @@ using MapNodes = std::vector<NewNode>;
 using FreePathNodes = std::vector<FreePathNode>;
 MapNodes nodes;
 FreePathNodes fpNodes;
+
+namespace {
+struct WeightedPathfindingPoint
+{
+    unsigned id;
+    double cost;
+    double estimate;
+    bool even;
+};
+
+struct WeightedPathfindingPointCompare
+{
+    bool operator()(const WeightedPathfindingPoint& lhs, const WeightedPathfindingPoint& rhs) const
+    {
+        if(lhs.estimate != rhs.estimate)
+            return lhs.estimate > rhs.estimate;
+        if(lhs.cost != rhs.cost)
+            return lhs.cost > rhs.cost;
+        if(lhs.id != rhs.id)
+            return lhs.id > rhs.id;
+        return lhs.even > rhs.even;
+    }
+};
+
+double GetStoredCost(const NewNode& node, bool currentStepEven)
+{
+    return currentStepEven ? node.costEven : node.cost;
+}
+
+unsigned GetStoredWay(const NewNode& node, bool currentStepEven)
+{
+    return currentStepEven ? node.wayEven : node.way;
+}
+
+bool HasVisited(const NewNode& node, unsigned currentVisit, bool currentStepEven)
+{
+    return currentStepEven ? node.lastVisitedEven == currentVisit : node.lastVisited == currentVisit;
+}
+
+bool IsStaleCost(double poppedCost, double storedCost)
+{
+    constexpr double epsilon = 0.000001;
+    return std::fabs(poppedCost - storedCost) > epsilon;
+}
+
+bool IsWorseOrEqualState(double newCost, unsigned newWay, const NewNode& oldNode, bool currentStepEven)
+{
+    constexpr double epsilon = 0.000001;
+    const double oldCost = GetStoredCost(oldNode, currentStepEven);
+    if(newCost + epsilon < oldCost)
+        return false;
+    if(std::fabs(newCost - oldCost) <= epsilon && newWay < GetStoredWay(oldNode, currentStepEven))
+        return false;
+    return true;
+}
+} // namespace
 
 void FreePathFinder::Init(const MapExtent& mapSize)
 {
@@ -254,5 +312,168 @@ bool FreePathFinder::FindPathAlternatingConditions(const MapPoint start, const M
     }
 
     // Liste leer und kein Ziel erreicht --> kein Weg
+    return false;
+}
+
+bool FreePathFinder::FindPathAlternatingConditionsWeighted(
+  const MapPoint start, const MapPoint dest, const bool randomRoute, const unsigned maxLength,
+  std::vector<Direction>* route, unsigned* length, Direction* firstDir, FP_Node_OK_Callback IsNodeOK,
+  FP_Node_OK_Callback IsNodeOKAlternate, FP_Node_OK_Callback IsNodeToDestOk, FP_Node_Cost_Callback GetNodeCost,
+  const void* param)
+{
+    if(start == dest)
+    {
+        RTTR_Assert(false);
+        LOG.write("WARNING: Bug detected (GF: %u). Please report this with the savegame and replay (Start==Dest in "
+                  "pathfinding %u,%u)\n")
+          % gwb_.GetEvMgr().GetCurrentGF() % unsigned(start.x) % unsigned(start.y);
+        if(route)
+            route->clear();
+        if(length)
+            *length = 0;
+        if(firstDir)
+            *firstDir = Direction::East;
+        return true;
+    }
+
+    IncreaseCurrentVisit();
+
+    std::priority_queue<WeightedPathfindingPoint, std::vector<WeightedPathfindingPoint>,
+                        WeightedPathfindingPointCompare>
+      todo;
+    const unsigned destId = gwb_.GetIdx(dest);
+    const unsigned startId = gwb_.GetIdx(start);
+
+    todo.push({startId, 0.0, static_cast<double>(gwb_.CalcDistance(start, dest)), false});
+    nodes[startId].prevEven = INVALID_PREV;
+    nodes[startId].lastVisitedEven = currentVisit;
+    nodes[startId].wayEven = 0;
+    nodes[startId].costEven = 0.0;
+
+    const Direction startDir =
+      randomRoute ? convertToDirection(gwb_.GetIdx(start) * gwb_.GetEvMgr().GetCurrentGF()) : Direction::West;
+
+    while(!todo.empty())
+    {
+        WeightedPathfindingPoint best = todo.top();
+        todo.pop();
+
+        const bool prevStepEven = !best.even;
+        unsigned bestId = best.id;
+        if(!HasVisited(nodes[bestId], currentVisit, prevStepEven)
+           || IsStaleCost(best.cost, GetStoredCost(nodes[bestId], prevStepEven)))
+        {
+            continue;
+        }
+
+        if(destId == bestId)
+        {
+            const unsigned routeLen = prevStepEven ? nodes[bestId].wayEven : nodes[bestId].way;
+            if(length)
+                *length = routeLen;
+            if(route)
+                route->resize(routeLen);
+
+            bool alternate = prevStepEven;
+            for(unsigned z = routeLen - 1; bestId != startId; --z)
+            {
+                if(route)
+                    (*route)[z] = alternate ? nodes[bestId].dirEven : nodes[bestId].dir;
+                if(firstDir && z == 0)
+                    *firstDir = nodes[bestId].dirEven;
+
+                bestId = alternate ? nodes[bestId].prevEven : nodes[bestId].prev;
+                alternate = !alternate;
+            }
+
+            return true;
+        }
+
+        if((prevStepEven && nodes[bestId].wayEven == maxLength) || (!prevStepEven && nodes[bestId].way == maxLength))
+            continue;
+
+        for(const auto dir : helpers::enumRange(startDir))
+        {
+            const MapPoint bestPos = nodes[bestId].mapPt;
+            MapPoint neighbourPos = gwb_.GetNeighbour(bestPos, dir);
+            unsigned nbId = gwb_.GetIdx(neighbourPos);
+
+            if(nbId != destId && ((prevStepEven && IsNodeOK) || (!prevStepEven && IsNodeOKAlternate)))
+            {
+                if(prevStepEven)
+                {
+                    if(!IsNodeOK(gwb_, neighbourPos, dir, param))
+                        continue;
+                } else
+                {
+                    if(!IsNodeOKAlternate(gwb_, neighbourPos, dir, param))
+                        continue;
+                    MapPoint p = nodes[bestId].mapPt;
+
+                    std::vector<MapPoint> evenLocationsOnRoute;
+                    bool alternate = false;
+                    unsigned back_id = bestId;
+                    for(unsigned i = nodes[bestId].way - 1; i > 1; i--)
+                    {
+                        Direction pdir = alternate ? nodes[back_id].dirEven : nodes[back_id].dir;
+                        p = gwb_.GetNeighbour(p, pdir + 3u);
+                        if(i % 2 == 0)
+                        {
+                            evenLocationsOnRoute.push_back(p);
+                        }
+                        back_id = alternate ? nodes[back_id].prevEven : nodes[back_id].prev;
+                        alternate = !alternate;
+                    }
+                    bool tooClose =
+                      helpers::contains_if(evenLocationsOnRoute, [this, neighbourPos](const MapPoint& it) {
+                          return gwb_.CalcDistance(neighbourPos, it) < 2;
+                      });
+                    if(tooClose)
+                        continue;
+                    if(gwb_.CalcDistance(neighbourPos, start) < 2)
+                        continue;
+                    if(gwb_.CalcDistance(neighbourPos, dest) < 2)
+                        continue;
+                }
+            }
+
+            if(IsNodeToDestOk && !IsNodeToDestOk(gwb_, neighbourPos, dir, param))
+                continue;
+
+            const unsigned prevWay = prevStepEven ? nodes[bestId].wayEven : nodes[bestId].way;
+            const unsigned nextWay = prevWay + 1;
+            const bool nextStepEven = !prevStepEven;
+            const double prevCost = GetStoredCost(nodes[bestId], prevStepEven);
+            const double stepCost =
+              GetNodeCost ? GetNodeCost(gwb_, bestPos, neighbourPos, dir, nextWay, nextStepEven, param) : 1.0;
+            const double nextCost = prevCost + stepCost;
+
+            if(HasVisited(nodes[nbId], currentVisit, nextStepEven)
+               && IsWorseOrEqualState(nextCost, nextWay, nodes[nbId], nextStepEven))
+            {
+                continue;
+            }
+
+            if(prevStepEven)
+            {
+                nodes[nbId].lastVisited = currentVisit;
+                nodes[nbId].way = nextWay;
+                nodes[nbId].cost = nextCost;
+                nodes[nbId].dir = dir;
+                nodes[nbId].prev = bestId;
+            } else
+            {
+                nodes[nbId].lastVisitedEven = currentVisit;
+                nodes[nbId].wayEven = nextWay;
+                nodes[nbId].costEven = nextCost;
+                nodes[nbId].dirEven = dir;
+                nodes[nbId].prevEven = bestId;
+            }
+
+            todo.push(
+              {nbId, nextCost, nextCost + static_cast<double>(gwb_.CalcDistance(neighbourPos, dest)), prevStepEven});
+        }
+    }
+
     return false;
 }

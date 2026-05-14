@@ -659,6 +659,43 @@ void applyBQPenaltyCfg(const YAML::Node& bqPenaltyNode, AIConfig& config)
         }
     }
 
+    if(const YAML::Node value = bqPenaltyNode["roadRouteWeightedSearch"])
+    {
+        try
+        {
+            config.bqPenalty.roadRouteWeightedSearch = value.as<bool>();
+        } catch(const YAML::TypedBadConversion<bool>& e)
+        {
+            std::cerr << "Warning: Invalid bqPenalty.roadRouteWeightedSearch value, using default. Error: "
+                      << e.what() << std::endl;
+        }
+    }
+
+    if(const YAML::Node value = bqPenaltyNode["roadRouteWeightedRefinementTopN"])
+    {
+        try
+        {
+            config.bqPenalty.roadRouteWeightedRefinementTopN = value.as<unsigned>();
+        } catch(const YAML::TypedBadConversion<unsigned>& e)
+        {
+            std::cerr << "Warning: Invalid bqPenalty.roadRouteWeightedRefinementTopN value, using default. Error: "
+                      << e.what() << std::endl;
+        }
+    }
+
+    if(const YAML::Node value = bqPenaltyNode["roadRouteWeightedRefinementScoreMargin"])
+    {
+        try
+        {
+            config.bqPenalty.roadRouteWeightedRefinementScoreMargin = value.as<double>();
+        } catch(const YAML::TypedBadConversion<double>& e)
+        {
+            std::cerr
+              << "Warning: Invalid bqPenalty.roadRouteWeightedRefinementScoreMargin value, using default. Error: "
+              << e.what() << std::endl;
+        }
+    }
+
     applyRoadRouteQualityValuesCfg(bqPenaltyNode["roadRouteQualityValues"], config);
 }
 } // namespace

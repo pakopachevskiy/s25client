@@ -17,6 +17,8 @@ struct NewNode
     /// Wegkosten, die vom Startpunkt bis zu diesem Knoten bestehen
     unsigned way = 0;
     unsigned wayEven = 0;
+    double cost = 0.0;
+    double costEven = 0.0;
     /// Die Richtung, über die dieser Knoten erreicht wurde
     Direction dir = Direction::West;
     Direction dirEven = Direction::West;

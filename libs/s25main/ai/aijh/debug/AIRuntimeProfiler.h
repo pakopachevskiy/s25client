@@ -42,6 +42,9 @@ enum class AIRuntimeProfileSection : unsigned
     UpdateTroopsLimitScore,
     UpdateTroopsLimitDistribute,
     UpdateTroopsLimitApply,
+    FindFreePathForNewRoad,
+    FindWeightedFreePathForNewRoad,
+    FindWeightedFreePathForNewRoadFallback,
     Count
 };
 

@@ -4,6 +4,7 @@
 
 #include "RttrForeachPt.h"
 #include "helpers/OptionalIO.h"
+#include "pathfinding/FreePathFinder.h"
 #include "worldFixtures/CreateEmptyWorld.h"
 #include "worldFixtures/WorldFixture.h"
 #include "worldFixtures/terrainHelpers.h"
@@ -69,6 +70,24 @@ void setupTestcase2to4(GameWorld& world, const MapPoint& startPt, DescIdx<Terrai
     if(bothTerrain)
         setRightTerrain(world, terrainPt, dir, tOther);
 }
+
+bool IsNodeOK_Always(const GameWorldBase&, const MapPoint, const Direction, const void*)
+{
+    return true;
+}
+
+struct WeightedPathTestParam
+{
+    MapPoint expensivePoint1;
+    MapPoint expensivePoint2;
+};
+
+double GetWeightedPathTestCost(const GameWorldBase&, MapPoint, MapPoint to, Direction, unsigned, bool,
+                               const void* param)
+{
+    const auto* testParam = static_cast<const WeightedPathTestParam*>(param);
+    return (to == testParam->expensivePoint1 || to == testParam->expensivePoint2) ? 100.0 : 1.0;
+}
 } // namespace
 
 BOOST_FIXTURE_TEST_CASE(WalkStraight, WorldFixtureEmpty0P)
@@ -96,6 +115,34 @@ BOOST_FIXTURE_TEST_CASE(WalkStraight, WorldFixtureEmpty0P)
             BOOST_TEST_REQUIRE(length == 3u);
         }
     }
+}
+
+BOOST_FIXTURE_TEST_CASE(WeightedAlternatingPathAvoidsExpensiveEqualDestinationRoute, WorldFixtureEmpty0P)
+{
+    const MapPoint startPt(1, 2);
+    MapPoint endPt = startPt;
+    for(unsigned i = 0; i < 3; ++i)
+        endPt = world.GetNeighbour(endPt, Direction::East);
+
+    const WeightedPathTestParam param{world.GetNeighbour(startPt, Direction::East),
+                                      world.GetNeighbour(world.GetNeighbour(startPt, Direction::East),
+                                                         Direction::East)};
+
+    std::vector<Direction> route;
+    unsigned length = 0;
+    BOOST_TEST_REQUIRE(world.GetFreePathFinder().FindPathAlternatingConditionsWeighted(
+      startPt, endPt, false, 10, &route, &length, nullptr, IsNodeOK_Always, nullptr, nullptr,
+      GetWeightedPathTestCost, &param));
+
+    MapPoint curPt = startPt;
+    for(const Direction dir : route)
+    {
+        curPt = world.GetNeighbour(curPt, dir);
+        BOOST_TEST(!(curPt == param.expensivePoint1));
+        BOOST_TEST(!(curPt == param.expensivePoint2));
+    }
+    BOOST_TEST_REQUIRE((curPt == endPt));
+    BOOST_TEST(length > 3u);
 }
 
 BOOST_FIXTURE_TEST_CASE(WalkAlongCoast, WorldFixtureEmpty0P)

@@ -11,6 +11,8 @@
 class GameWorldBase;
 
 using FP_Node_OK_Callback = bool (*)(const GameWorldBase&, const MapPoint, const Direction, const void*);
+using FP_Node_Cost_Callback = double (*)(const GameWorldBase&, MapPoint, MapPoint, Direction, unsigned, bool,
+                                         const void*);
 
 // There are 2 callback types:
 // IsNodeToDestOk: Called for every point to check if this node is usable
@@ -37,6 +39,12 @@ public:
                                        std::vector<Direction>* route, unsigned* length, Direction* firstDir,
                                        FP_Node_OK_Callback IsNodeOK, FP_Node_OK_Callback IsNodeOKAlternate,
                                        FP_Node_OK_Callback IsNodeToDestOk, const void* param);
+
+    bool FindPathAlternatingConditionsWeighted(MapPoint start, MapPoint dest, bool randomRoute, unsigned maxLength,
+                                               std::vector<Direction>* route, unsigned* length, Direction* firstDir,
+                                               FP_Node_OK_Callback IsNodeOK, FP_Node_OK_Callback IsNodeOKAlternate,
+                                               FP_Node_OK_Callback IsNodeToDestOk,
+                                               FP_Node_Cost_Callback GetNodeCost, const void* param);
 
     /// Ermittelt, ob eine freie Route noch passierbar ist und gibt den Endpunkt der Route zurück
     template<class TNodeChecker>

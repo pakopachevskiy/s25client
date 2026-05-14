@@ -6,6 +6,7 @@
 
 #include "EventManager.h"
 #include "ai/aijh/config/AIConfig.h"
+#include "ai/aijh/debug/AIRuntimeProfiler.h"
 #include "buildings/noBaseBuilding.h"
 #include "buildings/noBuildingSite.h"
 #include "buildings/nobHQ.h"
@@ -26,6 +27,7 @@
 #include <numeric>
 #include <set>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -60,6 +62,9 @@ struct Param_RoadPath
 {
     /// Boat or normal road
     bool boat_road;
+    const BQPenaltyConfig* bqPenalty = nullptr;
+    unsigned char playerId = 0;
+    mutable std::vector<double> approximateRoadRouteCostByNode;
 };
 
 bool IsPointOK_RoadPath(const GameWorldBase& gwb, const MapPoint pt, const Direction, const void* param)
@@ -223,6 +228,42 @@ void AddFutureRoadFlags(const GameWorldBase& gwb, const BQCalculator& bqCalculat
             AddFutureFlagAffectedPoints(gwb, flagPt, points.affectedPoints);
         }
     }
+}
+
+double GetApproximateRoadRouteNodeCost(const GameWorldBase& gwb, MapPoint, MapPoint to, Direction, unsigned, bool,
+                                       const void* param)
+{
+    const auto* prp = static_cast<const Param_RoadPath*>(param);
+    if(!prp->bqPenalty || prp->bqPenalty->roadRoute <= 0.0)
+        return 1.0;
+
+    const unsigned nodeIdx = gwb.GetIdx(to);
+    if(nodeIdx < prp->approximateRoadRouteCostByNode.size()
+       && prp->approximateRoadRouteCostByNode[nodeIdx] >= 0.0)
+    {
+        return prp->approximateRoadRouteCostByNode[nodeIdx];
+    }
+
+    const BQCalculator bqCalculator(gwb);
+    const auto isOnHypotheticalRoad = [&](MapPoint pt) { return gwb.IsOnRoad(pt) || pt == to; };
+    const std::set<MapPoint, MapPointLess> futureFlagPoints;
+
+    double penalty = 0.0;
+    const MapPoint affectedPoints[] = {to, gwb.GetNeighbour(to, Direction::East),
+                                       gwb.GetNeighbour(to, Direction::SouthEast),
+                                       gwb.GetNeighbour(to, Direction::SouthWest)};
+    for(const MapPoint affectedPt : affectedPoints)
+    {
+        const BuildingQuality beforeBQ = gwb.GetBQ(affectedPt, prp->playerId);
+        const BuildingQuality afterBQ =
+          GetHypotheticalBQ(gwb, bqCalculator, prp->playerId, affectedPt, isOnHypotheticalRoad, futureFlagPoints);
+        penalty += GetBuildingQualityPenalty(beforeBQ, afterBQ, *prp->bqPenalty);
+    }
+
+    const double cost = 1.0 + prp->bqPenalty->roadRoute * penalty;
+    if(nodeIdx < prp->approximateRoadRouteCostByNode.size())
+        prp->approximateRoadRouteCostByNode[nodeIdx] = cost;
+    return cost;
 }
 } // namespace
 
@@ -589,10 +630,46 @@ double AIQueryService::EstimateRoadRouteBQPenalty(MapPoint start, const std::vec
 bool AIQueryService::FindFreePathForNewRoad(MapPoint start, MapPoint target, std::vector<Direction>* route,
                                             unsigned* length) const
 {
-    bool boat = false;
+    const AIJH::ScopedAIRuntimeProfile profile(AIJH::AIRuntimeProfileSection::FindFreePathForNewRoad,
+                                               gwb.CalcDistance(start, target));
+    Param_RoadPath pathParam;
+    pathParam.boat_road = false;
+    pathParam.playerId = playerID_;
     return gwb.GetFreePathFinder().FindPathAlternatingConditions(start, target, false, 100, route, length, nullptr,
                                                                  IsPointOK_RoadPath, IsPointOK_RoadPathEvenStep,
-                                                                 nullptr, (void*)&boat);
+                                                                 nullptr, &pathParam);
+}
+
+bool AIQueryService::FindWeightedFreePathForNewRoad(MapPoint start, MapPoint target,
+                                                    const BQPenaltyConfig& bqPenalty,
+                                                    std::vector<Direction>* route, unsigned* length,
+                                                    const bool allowFallback) const
+{
+    if(bqPenalty.roadRoute <= 0.0)
+        return FindFreePathForNewRoad(start, target, route, length);
+
+    Param_RoadPath pathParam;
+    pathParam.boat_road = false;
+    pathParam.bqPenalty = &bqPenalty;
+    pathParam.playerId = playerID_;
+    pathParam.approximateRoadRouteCostByNode.assign(gwb.GetSize().x * gwb.GetSize().y, -1.0);
+    {
+        const AIJH::ScopedAIRuntimeProfile profile(AIJH::AIRuntimeProfileSection::FindWeightedFreePathForNewRoad,
+                                                   gwb.CalcDistance(start, target));
+        if(gwb.GetFreePathFinder().FindPathAlternatingConditionsWeighted(
+             start, target, false, 100, route, length, nullptr, IsPointOK_RoadPath, IsPointOK_RoadPathEvenStep, nullptr,
+             GetApproximateRoadRouteNodeCost, &pathParam))
+        {
+            return true;
+        }
+    }
+
+    if(!allowFallback)
+        return false;
+
+    const AIJH::ScopedAIRuntimeProfile fallbackProfile(
+      AIJH::AIRuntimeProfileSection::FindWeightedFreePathForNewRoadFallback, gwb.CalcDistance(start, target));
+    return FindFreePathForNewRoad(start, target, route, length);
 }
 
 bool AIQueryService::FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length) const

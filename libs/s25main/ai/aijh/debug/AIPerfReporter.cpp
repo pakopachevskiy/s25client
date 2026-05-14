@@ -23,7 +23,7 @@ struct CsvSection
     const char* name;
 };
 
-constexpr std::array<CsvSection, 11> kCsvSections = {{
+constexpr std::array<CsvSection, 14> kCsvSections = {{
   {AIJH::AIRuntimeProfileSection::RunGF, "RunGF"},
   {AIJH::AIRuntimeProfileSection::RefreshBuildingQualities, "RefreshBuildingQualities"},
   {AIJH::AIRuntimeProfileSection::BuildingPlannerUpdate, "BuildingPlannerUpdate"},
@@ -35,6 +35,9 @@ constexpr std::array<CsvSection, 11> kCsvSections = {{
   {AIJH::AIRuntimeProfileSection::UpdateTroopsLimit, "UpdateTroopsLimit"},
   {AIJH::AIRuntimeProfileSection::AdjustSettings, "AdjustSettings"},
   {AIJH::AIRuntimeProfileSection::PlanNewBuildings, "PlanNewBuildings"},
+  {AIJH::AIRuntimeProfileSection::FindFreePathForNewRoad, "FindFreePathForNewRoad"},
+  {AIJH::AIRuntimeProfileSection::FindWeightedFreePathForNewRoad, "FindWeightedFreePathForNewRoad"},
+  {AIJH::AIRuntimeProfileSection::FindWeightedFreePathForNewRoadFallback, "FindWeightedFreePathForNewRoadFallback"},
 }};
 
 std::ofstream CreatePerfCsvFile()

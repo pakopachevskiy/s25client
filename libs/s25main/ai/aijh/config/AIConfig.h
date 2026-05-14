@@ -48,6 +48,9 @@ struct BQPenaltyConfig
 
     double buildLocation = 0.05;
     double roadRoute = 1.0;
+    bool roadRouteWeightedSearch = true;
+    unsigned roadRouteWeightedRefinementTopN = 3;
+    double roadRouteWeightedRefinementScoreMargin = 25.0;
     helpers::EnumArray<double, BuildingQuality> roadRouteQualityValues;
 };
 

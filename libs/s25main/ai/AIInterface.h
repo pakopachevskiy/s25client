@@ -48,6 +48,12 @@ public:
     {
         return queryService_.FindFreePathForNewRoad(start, target, route, length);
     }
+    bool FindWeightedFreePathForNewRoad(MapPoint start, MapPoint target, const BQPenaltyConfig& bqPenalty,
+                                        std::vector<Direction>* route = nullptr, unsigned* length = nullptr,
+                                        bool allowFallback = true) const
+    {
+        return queryService_.FindWeightedFreePathForNewRoad(start, target, bqPenalty, route, length, allowFallback);
+    }
     bool FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr) const
     {
         return queryService_.FindPathOnRoads(start, target, length);

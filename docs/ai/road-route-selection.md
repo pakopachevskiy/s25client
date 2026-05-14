@@ -67,12 +67,26 @@ fixed order. As a result:
 
 ## Building the New Road Segment
 
-For each candidate flag, `ConnectFlagToRoadSytem()` asks
-`FindFreePathForNewRoad()` for a free-terrain route from the source flag to the
-candidate.
+For each surviving candidate flag, `ConnectFlagToRoadSytem()` first asks for an
+unweighted free-terrain route from the source flag to the candidate via
+`AIQueryService::FindFreePathForNewRoad()`. That broad pass keeps the robust old
+route finder as the baseline for candidate scoring.
 
-That query uses `FreePathFinder::FindPathAlternatingConditions()`, which is an
-A*-style search with a maximum length of `100`.
+When `bqPenalty.roadRoute` and `bqPenalty.roadRouteWeightedSearch` are both
+enabled, the best few unweighted candidates are refined with
+`AIQueryService::FindWeightedFreePathForNewRoad(..., allowFallback = false)`.
+That query calls `FreePathFinder::FindPathAlternatingConditionsWeighted()`, an
+A*-style search with a maximum physical length of `100`.
+
+Weighted refinement is limited by:
+
+- `bqPenalty.roadRouteWeightedRefinementTopN`, default `3`,
+- `bqPenalty.roadRouteWeightedRefinementScoreMargin`, default `25.0`.
+
+Candidates are refined when they are in the top `N` unweighted scores or within
+the score margin of the best unweighted candidate. If weighted refinement fails,
+the already scored unweighted route remains available. Direct callers can still
+allow the weighted query to fall back to `FindFreePathForNewRoad()`.
 
 The pathfinder enforces several road-specific constraints:
 
@@ -98,10 +112,52 @@ For land roads, at least one surrounding terrain slot must support something
 better than `TerrainBQ::Nothing`, otherwise the point is not considered a valid
 road tile.
 
+The weighted search keeps physical route length separate from weighted cost:
+
+- physical length is still used for the `100`-step limit and returned to road
+  construction,
+- weighted cost is used to order and replace pathfinder states,
+- each map point has separate odd/even parity state, as in the alternating
+  search.
+
+The weighted implementation uses a heap-backed open list and skips stale
+entries when a better state for the same point/parity has already been stored.
+Local approximate BQ costs are cached per search by entered map point.
+
+The weighted step cost is AI-specific and intentionally approximate:
+
+```text
+stepCost = 1.0 + bqPenalty.roadRoute * approximateLocalBQPenalty
+```
+
+The local estimate considers the route point being entered and the same nearby
+road-BQ footprint used by exact route scoring:
+
+- `pt`,
+- `East(pt)`,
+- `SouthEast(pt)`,
+- `SouthWest(pt)`.
+
+For those points it compares current BQ against a cheap hypothetical BQ where
+the entered route point is treated as road, then converts positive downgrades
+through `bqPenalty.roadRouteQualityValues`.
+
+This approximation only guides route generation. It does not replace the exact
+route-global BQ estimator used by final scoring.
+
 ## Main Connection Scoring
 
-After a free-terrain route is found, `ConnectFlagToRoadSytem()` filters and
-scores it.
+Before terrain pathfinding, `ConnectFlagToRoadSytem()` rejects candidate flags
+that are already road-connected to the source flag or cannot reach the chosen
+warehouse. Once a best score exists, it also skips candidates whose lower bound
+cannot win:
+
+```text
+minScore = 2 * mapDistance(sourceFlag, candidateFlag)
+           + warehouseRoadDistance
+```
+
+After a free-terrain route is found, it filters and scores it.
 
 First it rejects candidates that:
 
@@ -141,7 +197,9 @@ downgrade cost `0.5`, while a `Castle -> Hut` downgrade costs `5.0`.
 The doubled weight on `newRoadLength` means the AI prefers short new
 construction even when the total end-to-end route would be similar either way,
 while the BQ term lightly discourages routes that destroy more valuable
-building plots.
+building plots. Because route generation now also has a local BQ-aware weight,
+the AI can pick a slightly longer free-terrain route to the same candidate flag
+when that route avoids expensive building-quality damage.
 
 ## How Existing Road Distance Is Measured
 
@@ -176,7 +234,11 @@ This pass:
 
 - searches nearby owned flags again,
 - requires the candidate to already be connected to the road system,
-- computes a new free-terrain road to that flag,
+- computes existing road distance before terrain pathfinding so candidates
+  whose straight-distance lower bound cannot win can be skipped,
+- computes an unweighted new free-terrain road to that flag,
+- runs weighted refinement only when the unweighted route is close enough to
+  the build threshold, or when no current road path exists,
 - compares that new segment against the current road-network distance.
 
 The road is built only if:
@@ -193,6 +255,15 @@ every route, only to add clearly superior bypasses.
   not by road distance.
 - `FindFlags()` is capped to `30` results, so dense local flag clusters can hide
   farther-but-better options.
+- Weighted route search changes route preference, not route validity. The same
+  road-buildable, alternating flaggable-node, and spacing constraints still
+  apply.
+- Weighted search is a refinement step, not the broad candidate search. The
+  unweighted route remains the fallback route for candidates that are not
+  refined or whose weighted refinement fails.
+- The weighted search uses a local BQ approximation. The final route score still
+  uses `EstimateRoadRouteBQPenalty()`, which models the full hypothetical road
+  and future interior flags.
 - `MinorRoadImprovements()` currently returns immediately into `BuildRoad()`.
   The code below that early return is effectively disabled.
 - The construction heuristic is local and greedy. It does not restructure the
@@ -212,4 +283,6 @@ every route, only to add clearly superior bypasses.
   - a better flag was beyond the `30`-candidate cap,
   - the nearest warehouse by map distance was not the best warehouse by road,
   - the free-terrain road pathfinder rejected the more obvious route due to
-    flag-placement constraints.
+    flag-placement constraints,
+  - the weighted route search avoided a shorter route because its local BQ
+    damage estimate was higher.

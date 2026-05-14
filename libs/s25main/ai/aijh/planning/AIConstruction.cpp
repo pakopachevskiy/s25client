@@ -283,6 +283,48 @@ namespace {
         IsValidFlag(const unsigned playerId) : playerId_(playerId) {}
         bool operator()(const noFlag* const flag) const { return flag && flag->GetPlayer() == playerId_; }
     };
+
+    unsigned GetMaxNonFlaggableRun(const AIInterface& aii, const AIPlanningContext& aijh, const MapPoint start,
+                                   const std::vector<Direction>& route)
+    {
+        unsigned maxNonFlagPts = 0;
+        unsigned curNonFlagPts = 0;
+        MapPoint tmpPos = start;
+        for(const Direction dir : route)
+        {
+            tmpPos = aii.gwb.GetNeighbour(tmpPos, dir);
+            RTTR_Assert(aii.GetBuildingQuality(tmpPos) == aijh.GetAINode(tmpPos).bq);
+            if(aii.GetBuildingQuality(tmpPos) == BuildingQuality::Nothing)
+                ++curNonFlagPts;
+            else
+            {
+                maxNonFlagPts = std::max(maxNonFlagPts, curNonFlagPts);
+                curNonFlagPts = 0;
+            }
+        }
+        return std::max(maxNonFlagPts, curNonFlagPts);
+    }
+
+    double ScoreMainRoadRoute(const AIInterface& aii, const BQPenaltyConfig& bqPenaltyConfig, const MapPoint start,
+                              const std::vector<Direction>& route, const unsigned length,
+                              const unsigned warehouseDistance, const unsigned maxNonFlagPts)
+    {
+        const unsigned odd = length % 2 != 0 ? 5 : 0;
+        const double bqPenalty = (bqPenaltyConfig.roadRoute > 0.0)
+                                   ? aii.Queries().EstimateRoadRouteBQPenalty(start, route, bqPenaltyConfig)
+                                   : 0.0;
+        return odd + 2 * length + warehouseDistance + 10 * maxNonFlagPts
+               + bqPenaltyConfig.roadRoute * bqPenalty;
+    }
+
+    struct MainRoadCandidate
+    {
+        const noFlag* flag = nullptr;
+        unsigned warehouseDistance = 0;
+        unsigned length = 0;
+        double score = std::numeric_limits<double>::infinity();
+        std::vector<Direction> route;
+    };
 } // namespace
 
 std::vector<const noFlag*> AIConstruction::FindFlags(const MapPoint pt, unsigned short radius)
@@ -369,45 +411,22 @@ bool AIConstruction::ConnectFlagToRoadSytem(const noFlag* flag, std::vector<Dire
     std::cout << "FindFlagsNum: " << flags.size() << std::endl;
 #endif
 
-    const noFlag* shortest = nullptr;
-    double shortestLength = std::numeric_limits<double>::infinity();
-    std::vector<Direction> tmpRoute;
     const auto& bqPenaltyConfig = aijh.GetConfig().bqPenalty;
-    const double roadRouteBQPenalty = bqPenaltyConfig.roadRoute;
+    const bool useWeightedRefinement =
+      bqPenaltyConfig.roadRoute > 0.0 && bqPenaltyConfig.roadRouteWeightedSearch
+      && bqPenaltyConfig.roadRouteWeightedRefinementTopN > 0;
+    MainRoadCandidate bestCandidate;
+    std::vector<MainRoadCandidate> candidates;
 
     // Test each flag...
     for(const noFlag* curFlag : flags)
     {
-        tmpRoute.clear();
-        unsigned length;
         // the flag should not be at a military building!
         // if(aii.gwb.IsMilitaryBuildingOnNode(aii.gwb.GetNeighbour(curFlag->GetPos(), Direction::NorthWest), true))
         //     continue;
-        // Is there any path to this flag at all?
-        if(!aii.FindFreePathForNewRoad(flag->GetPos(), curFlag->GetPos(), &tmpRoute, &length))
-            continue;
 
-        // If so, check whether this path is as short as possible to the "higher" target
-        // (currently the main warehouse)
-        unsigned maxNonFlagPts = 0;
-        // check for non-flag points on planned route: more than 2 nonflaggable spaces on the route -> not really valid
-        // path
-        unsigned curNonFlagPts = 0;
-        MapPoint tmpPos = flag->GetPos();
-        for(auto j : tmpRoute)
-        {
-            tmpPos = aii.gwb.GetNeighbour(tmpPos, j);
-            RTTR_Assert(aii.GetBuildingQuality(tmpPos) == aijh.GetAINode(tmpPos).bq);
-            if(aii.GetBuildingQuality(tmpPos) == BuildingQuality::Nothing)
-                curNonFlagPts++;
-            else
-            {
-                if(maxNonFlagPts < curNonFlagPts)
-                    maxNonFlagPts = curNonFlagPts;
-                curNonFlagPts = 0;
-            }
-        }
-        if(maxNonFlagPts > 2)
+        // Are we already connected to this flag? Once is enough!
+        if(aii.FindPathOnRoads(*curFlag, *flag))
             continue;
 
         // Find path from current flag to target. If the current flag IS the target then we have already a path with
@@ -419,36 +438,81 @@ bool AIConstruction::ConnectFlagToRoadSytem(const noFlag* flag, std::vector<Dire
         if(!pathFound)
             continue;
 
-        // Are we already connected to this flag? Once is enough!
-        if(aii.FindPathOnRoads(*curFlag, *flag))
+        const double minScore = 2.0 * aii.gwb.CalcDistance(flag->GetPos(), curFlag->GetPos()) + distance;
+        if(minScore >= bestCandidate.score)
             continue;
 
-        unsigned odd = length % 2 != 0 ? 5 : 0;
-        const double bqPenalty = (roadRouteBQPenalty > 0.0)
-                                   ? aii.Queries().EstimateRoadRouteBQPenalty(flag->GetPos(), tmpRoute,
-                                                                              bqPenaltyConfig)
-                                   : 0.0;
-        const double score =
-          odd + 2 * length + distance + 10 * maxNonFlagPts + roadRouteBQPenalty * bqPenalty;
-        // Shorter than the last one? Take it! Weight the new build segment higher (2) so
-        // shorter new road segments are preferred when total path options are similar
-        if(score < shortestLength)
+        MainRoadCandidate candidate;
+        candidate.flag = curFlag;
+        candidate.warehouseDistance = distance;
+        if(!aii.FindFreePathForNewRoad(flag->GetPos(), curFlag->GetPos(), &candidate.route, &candidate.length))
+            continue;
+
+        // More than 2 nonflaggable spaces on the route is not really valid.
+        const unsigned maxNonFlagPts = GetMaxNonFlaggableRun(aii, aijh, flag->GetPos(), candidate.route);
+        if(maxNonFlagPts > 2)
+            continue;
+
+        candidate.score = ScoreMainRoadRoute(aii, bqPenaltyConfig, flag->GetPos(), candidate.route, candidate.length,
+                                             candidate.warehouseDistance, maxNonFlagPts);
+        if(candidate.score < bestCandidate.score)
         {
-            shortest = curFlag;
-            shortestLength = score;
-            route = tmpRoute;
+            bestCandidate = candidate;
+            route = candidate.route;
+        }
+        candidates.push_back(std::move(candidate));
+    }
+
+    if(useWeightedRefinement && !candidates.empty())
+    {
+        std::stable_sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
+            return lhs.score < rhs.score;
+        });
+
+        const double refinementScoreLimit =
+          bestCandidate.score + bqPenaltyConfig.roadRouteWeightedRefinementScoreMargin;
+        for(size_t idx = 0; idx < candidates.size(); ++idx)
+        {
+            const bool isTopCandidate = idx < bqPenaltyConfig.roadRouteWeightedRefinementTopN;
+            if(!isTopCandidate && candidates[idx].score > refinementScoreLimit)
+                break;
+
+            std::vector<Direction> weightedRoute;
+            unsigned weightedLength = 0;
+            if(!aii.FindWeightedFreePathForNewRoad(flag->GetPos(), candidates[idx].flag->GetPos(), bqPenaltyConfig,
+                                                   &weightedRoute, &weightedLength, false))
+            {
+                continue;
+            }
+
+            const unsigned maxNonFlagPts = GetMaxNonFlaggableRun(aii, aijh, flag->GetPos(), weightedRoute);
+            if(maxNonFlagPts > 2)
+                continue;
+
+            const double weightedScore =
+              ScoreMainRoadRoute(aii, bqPenaltyConfig, flag->GetPos(), weightedRoute, weightedLength,
+                                 candidates[idx].warehouseDistance, maxNonFlagPts);
+            if(weightedScore < bestCandidate.score)
+            {
+                bestCandidate.flag = candidates[idx].flag;
+                bestCandidate.warehouseDistance = candidates[idx].warehouseDistance;
+                bestCandidate.length = weightedLength;
+                bestCandidate.score = weightedScore;
+                bestCandidate.route = std::move(weightedRoute);
+                route = bestCandidate.route;
+            }
         }
     }
 
-    if(shortest)
+    if(bestCandidate.flag)
     {
         // LOG.write(("ai build main road player %i at %i %i\n", flag->GetPlayer(), flag->GetPos());
-        if(!MinorRoadImprovements(flag, shortest, route))
+        if(!MinorRoadImprovements(flag, bestCandidate.flag, route))
             return false;
         // add new construction area to the list of active orders in the current nwf
         // to wait till path is constructed
         constructionlocations.push_back(flag->GetPos());
-        constructionlocations.push_back(shortest->GetPos());
+        constructionlocations.push_back(bestCandidate.flag->GetPos());
         return true;
     }
     return false;
@@ -694,6 +758,9 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
     std::vector<Direction> mainroad = route;
     const auto& bqPenaltyConfig = aijh.GetConfig().bqPenalty;
     const double roadRouteBQPenalty = bqPenaltyConfig.roadRoute;
+    const bool useWeightedRefinement =
+      roadRouteBQPenalty > 0.0 && bqPenaltyConfig.roadRouteWeightedSearch
+      && bqPenaltyConfig.roadRouteWeightedRefinementTopN > 0;
     // targetflag for mainroad
     MapPoint t = flag->GetPos();
     for(auto i : mainroad)
@@ -720,15 +787,8 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
         if(!IsConnectedToRoadSystem(&curFlag))
             continue;
 
-        // Is there any path to this flag at all?
-        if(!aii.FindFreePathForNewRoad(flag->GetPos(), curFlag.GetPos(), &route, &newLength))
-            continue;
-
-        // If so, check whether our current route to this flag is much longer and a new road
-        // would be worth it
+        // Current route to this flag. This is cheap compared to terrain pathfinding and gives an upper bound.
         unsigned oldLength = 0;
-
-        // Current route to this flag
         bool pathAvailable = aii.FindPathOnRoads(curFlag, *flag, &oldLength);
         if(!pathAvailable && mainflag)
         {
@@ -736,43 +796,54 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
             if(pathAvailable)
                 oldLength += mainroad.size();
         }
+
+        if(pathAvailable && aii.gwb.CalcDistance(flag->GetPos(), curFlag.GetPos()) * lengthFactor >= oldLength)
+            continue;
+
+        // Is there any path to this flag at all?
+        std::vector<Direction> candidateRoute;
+        if(!aii.FindFreePathForNewRoad(flag->GetPos(), curFlag.GetPos(), &candidateRoute, &newLength))
+            continue;
+
         bool crossmainpath = false;
-        unsigned size = 0;
-        // more than 5 nonflaggable spaces on the route -> not really valid path
-        unsigned temp = 0;
-        t = flag->GetPos();
-        for(auto j : route)
-        {
-            t = aii.gwb.GetNeighbour(t, j);
-            // MapPoint t2 = flag->GetPos();
-            // check if we cross the planned main road
-            // for(auto k : mainroad)
-            // {
-            //     t2 = aii.gwb.GetNeighbour(t2, k);
-            //     if(t2 == t)
-            //     {
-            //         crossmainpath = true;
-            //         break;
-            //     }
-            // }
-            RTTR_Assert(aii.GetBuildingQuality(t) == aijh.GetAINode(t).bq);
-            if(aii.GetBuildingQuality(t) == BuildingQuality::Nothing)
-                temp++;
-            else
-            {
-                if(size < temp)
-                    size = temp;
-                temp = 0;
-            }
-        }
+        // more than 2 nonflaggable spaces on the route -> not really valid path
+        unsigned size = GetMaxNonFlaggableRun(aii, aijh, flag->GetPos(), candidateRoute);
         if(size > 2 || crossmainpath)
             continue;
 
         // Is the road worth it?
         const double bqPenalty = (roadRouteBQPenalty > 0.0)
-                                   ? aii.Queries().EstimateRoadRouteBQPenalty(flag->GetPos(), route, bqPenaltyConfig)
+                                   ? aii.Queries().EstimateRoadRouteBQPenalty(flag->GetPos(), candidateRoute,
+                                                                              bqPenaltyConfig)
                                    : 0.0;
-        const double effectiveNewLength = newLength * lengthFactor + roadRouteBQPenalty * bqPenalty;
+        double effectiveNewLength = newLength * lengthFactor + roadRouteBQPenalty * bqPenalty;
+        route = candidateRoute;
+
+        if(useWeightedRefinement
+           && (!pathAvailable
+               || effectiveNewLength < oldLength + bqPenaltyConfig.roadRouteWeightedRefinementScoreMargin))
+        {
+            std::vector<Direction> weightedRoute;
+            unsigned weightedLength = 0;
+            if(aii.FindWeightedFreePathForNewRoad(flag->GetPos(), curFlag.GetPos(), bqPenaltyConfig, &weightedRoute,
+                                                  &weightedLength, false))
+            {
+                size = GetMaxNonFlaggableRun(aii, aijh, flag->GetPos(), weightedRoute);
+                if(size <= 2)
+                {
+                    const double weightedBQPenalty =
+                      aii.Queries().EstimateRoadRouteBQPenalty(flag->GetPos(), weightedRoute, bqPenaltyConfig);
+                    const double weightedEffectiveNewLength =
+                      weightedLength * lengthFactor + roadRouteBQPenalty * weightedBQPenalty;
+                    if(weightedEffectiveNewLength < effectiveNewLength)
+                    {
+                        effectiveNewLength = weightedEffectiveNewLength;
+                        route = std::move(weightedRoute);
+                    }
+                }
+            }
+        }
+
         if(!pathAvailable || effectiveNewLength < oldLength)
         {
             if(BuildRoad(flag, &curFlag, route))
