@@ -4,6 +4,7 @@
 
 #include "noTree.h"
 
+#include "EnvironmentEventLogger.h"
 #include "EventManager.h"
 #include "FOWObjects.h"
 #include "GameInterface.h"
@@ -187,6 +188,7 @@ void noTree::HandleEvent(const unsigned id)
         {
             // Baum verschwindet nun und es bleibt ein Baumstumpf zurück
             event = nullptr;
+            EnvironmentEventLogger::LogTreeCut(GetEvMgr().GetCurrentGF(), *world, pos, *this);
             GetEvMgr().AddToKillList(this);
             world->SetNO(pos, new noDisappearingMapEnvObject(pos, 531), true);
             world->RecalcBQAroundPoint(pos);

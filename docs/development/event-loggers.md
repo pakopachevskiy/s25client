@@ -7,6 +7,7 @@ This document summarizes the runtime event loggers currently available in `s25ma
 - `CombatEventLogger`
 - `CountryEventLogger`
 - `CountryPlotEventLogger`
+- `EnvironmentEventLogger`
 - `MilitaryEventLogger`
 - `RoadEventLogger`
 - `TroopsLimitEventLogger`
@@ -15,7 +16,8 @@ This document summarizes the runtime event loggers currently available in `s25ma
 All loggers are gated by `STATS_CONFIG.statsPath`. If it is empty, no log file is written.
 When running `extras/ai-battle`, `--disable_event_logging` disables all event loggers and
 `--enabled_event_loggers <names...>` restricts output to a subset. Supported CLI names are
-`building`, `combat`, `country`, `country-plot`, `military`, `road`, `tool-priority`, `troops-limit`, and `ware`.
+`building`, `combat`, `country`, `country-plot`, `environment`, `military`, `road`, `tool-priority`,
+`troops-limit`, and `ware`.
 Text and protobuf event loggers buffer new records in memory and flush them when logging reaches the next
 500-gameframe boundary, with a final flush during shutdown.
 
@@ -162,6 +164,42 @@ Tracks exact territory plots acquired or lost by player.
 - Changed plots are grouped by `old_owner_id -> new_owner_id`.
 - Plot positions are stored as packed delta-encoded row-major indices within a local bounding box.
 - At gameframe `0`, the logger writes a full initial ownership snapshot as `0 -> player` transitions.
+
+## EnvironmentEventLogger
+
+### Purpose
+Tracks map-environment resource changes for trees and granite.
+
+### Events
+- `tree_initial`
+- `granite_initial`
+- `tree_planted`
+- `tree_cut`
+- `granite_hew`
+
+### Hooks
+- Initial trees and granite:
+  - `MapLoader::Load(...)` after map objects are placed at gameframe `0`
+- Tree planted:
+  - Forester completion path in `nofForester::WorkFinished()`
+- Tree cut:
+  - Fallen-tree removal path in `noTree::HandleEvent(...)`
+- Granite hewn:
+  - Stonemason completion path in `nofStonemason::WorkFinished()`
+
+### Output
+- File: `environment_log.pb`
+- Format: length-delimited protobuf stream
+- Stream layout:
+  - one `EnvironmentLogHeader`
+  - followed by repeated `EnvironmentLogRecord`
+- Schema: `external/proto-repo/environment_log.proto`
+
+### Notes
+- Initial environment records are emitted only when map loading happens at gameframe `0`.
+- `tree_cut` is emitted when the fallen tree is actually removed from the map and replaced by the stump object, so
+  aborted woodcutter work is not logged as a cut tree.
+- `granite_hew` records include the granite size before and after the stonemason action.
 
 ## MilitaryEventLogger
 

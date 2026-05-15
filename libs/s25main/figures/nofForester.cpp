@@ -4,6 +4,8 @@
 
 #include "nofForester.h"
 
+#include "EnvironmentEventLogger.h"
+#include "EventManager.h"
 #include "GameInterface.h"
 #include "GamePlayer.h"
 #include "Loader.h"
@@ -72,7 +74,9 @@ void nofForester::WorkFinished()
         uint8_t landscapeType = std::min<uint8_t>(world->GetLandscapeType().value, AVAILABLE_TREES.size() - 1);
 
         // jungen Baum einsetzen
-        world->SetNO(pos, new noTree(pos, RANDOM_ELEMENT(AVAILABLE_TREES[landscapeType]), 0));
+        auto* tree = new noTree(pos, RANDOM_ELEMENT(AVAILABLE_TREES[landscapeType]), 0);
+        world->SetNO(pos, tree);
+        EnvironmentEventLogger::LogTreePlanted(world->GetEvMgr().GetCurrentGF(), *world, pos, *tree);
 
         // BQ drumherum neu berechnen
         world->RecalcBQAroundPoint(pos);

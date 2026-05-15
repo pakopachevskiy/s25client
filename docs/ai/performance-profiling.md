@@ -9,6 +9,8 @@ See also:
   the global position search timed by `ExecuteGlobalBuildJobs`.
 - [resource-value-cache.md](resource-value-cache.md) — the cache hit/miss
   counters mentioned for inclusion in the CSV output.
+- [road-route-selection.md](road-route-selection.md) — the road pathfinder
+  sections emitted by `FindFreePathForNewRoad` and weighted refinement.
 - [attack-target-selection.md](attack-target-selection.md) — `TryToAttack`,
   `TrySeaAttack`, and the `Attrition*` sections.
 - [troops-limiting.md](troops-limiting.md) — `UpdateTroopsLimit*`
@@ -38,8 +40,9 @@ RTTR_AI_PROFILE=1 ./s25client
 RTTR_AI_PROFILE=1 ./ai-battle ...
 ```
 
-Without the variable the profiler accumulates no data and all CSV columns show
-zero.
+Without the variable the profiler accumulates no runtime timing data, so the
+section timing columns stay zero. The resource-value cache counters are gathered
+from `AIQueryService` and may still show activity.
 
 ## Instrumentation
 
@@ -89,6 +92,9 @@ Defined in `AIRuntimeProfileSection` (`AIRuntimeProfiler.h`):
 | `UpdateTroopsLimitScore` | Scoring pass |
 | `UpdateTroopsLimitDistribute` | Distribution pass |
 | `UpdateTroopsLimitApply` | Limit application pass |
+| `FindFreePathForNewRoad` | Unweighted free-terrain road route search |
+| `FindWeightedFreePathForNewRoad` | Weighted road route search used for BQ-aware refinement |
+| `FindWeightedFreePathForNewRoadFallback` | Fallback from weighted route search to the unweighted route finder |
 
 ## `ai_performance.csv`
 
@@ -106,11 +112,15 @@ Written to `STATS_CONFIG.statsPath/ai_performance.csv`, appended each time
 | `<Section>_AvgUsPerGF` | Average microseconds per game frame spent in this section during the window |
 | `<Section>_AvgUsPerCall` | Average microseconds per invocation of this section during the window |
 | `<Section>_Calls` | Number of times the section ran during the window |
+| `ResourceValueCache_Hits` | Resource-value cache hits during the window |
+| `ResourceValueCache_Misses` | Resource-value cache misses during the window |
 
 Section columns are emitted for: `RunGF`, `RefreshBuildingQualities`,
 `BuildingPlannerUpdate`, `ExecuteAIJob`, `EvaluateCaptureRisks`, `TryToAttack`,
 `TrySeaAttack`, `CheckEconomicHotspots`, `UpdateTroopsLimit`, `AdjustSettings`,
-`PlanNewBuildings`.
+`PlanNewBuildings`, `FindFreePathForNewRoad`,
+`FindWeightedFreePathForNewRoad`, and
+`FindWeightedFreePathForNewRoadFallback`.
 
 ### Reading the data
 
@@ -119,6 +129,12 @@ Section columns are emitted for: `RunGF`, `RefreshBuildingQualities`,
 - Infrequent sections (`EvaluateCaptureRisks`, `CheckEconomicHotspots`, etc.)
   show zero `Calls` in windows where they did not fire. Their `AvgUsPerCall`
   only reflects windows where they actually ran.
+- Road-route columns separate the broad unweighted search from the weighted
+  refinement pass. A non-zero `FindWeightedFreePathForNewRoadFallback_Calls`
+  count means a weighted request fell back to the unweighted pathfinder.
+- `ResourceValueCache_Hits` and `ResourceValueCache_Misses` are per-window
+  deltas, not cumulative totals. Compare them with the global build and route
+  sections to see whether search-heavy windows are benefiting from cache reuse.
 - The first row (GF 0) has `WindowGameFrames = 0` and all section values are
   zero — no AI work has been done yet when that row is written.
 - The sum of child section `AvgUsPerGF` values will be lower than
