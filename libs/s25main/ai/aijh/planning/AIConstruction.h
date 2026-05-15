@@ -30,6 +30,12 @@ class BuildingPlanner;
 class BuildJob;
 class ConnectJob;
 
+enum class AlternativeRoadPolicy
+{
+    ShortcutOnly,
+    BuildFirstValid
+};
+
 class AIConstruction
 {
 public:
@@ -69,8 +75,9 @@ public:
     helpers::OptionalEnum<BuildingType> ChooseMilitaryBuilding(MapPoint pt);
     /// Checks whether a building type is wanted atm
     bool Wanted(BuildingType type) const;
-    /// Tries to build a second road to a flag, which is in any way better than the first one
-    bool BuildAlternativeRoad(const noFlag* flag, std::vector<Direction>& route);
+    /// Tries to build a second road to a flag.
+    bool BuildAlternativeRoad(const noFlag* flag, std::vector<Direction>& route,
+                              AlternativeRoadPolicy policy = AlternativeRoadPolicy::ShortcutOnly);
 
     bool OtherStoreInRadius(MapPoint pt, unsigned radius);
 

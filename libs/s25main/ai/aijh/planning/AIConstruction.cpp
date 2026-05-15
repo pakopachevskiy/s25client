@@ -745,7 +745,8 @@ bool AIConstruction::Wanted(BuildingType type) const
     return constructionorders[type] < bldPlanner.GetNumAdditionalBuildingsWanted(type);
 }
 
-bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direction>& route)
+bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direction>& route,
+                                          const AlternativeRoadPolicy policy)
 {
     // LOG.write(("ai build alt road player %i at %i %i\n", flag->GetPlayer(), flag->GetPos());
     // Radius in which to search for suitable flags
@@ -797,7 +798,8 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
                 oldLength += mainroad.size();
         }
 
-        if(pathAvailable && aii.gwb.CalcDistance(flag->GetPos(), curFlag.GetPos()) * lengthFactor >= oldLength)
+        if(policy == AlternativeRoadPolicy::ShortcutOnly && pathAvailable
+           && aii.gwb.CalcDistance(flag->GetPos(), curFlag.GetPos()) * lengthFactor >= oldLength)
             continue;
 
         // Is there any path to this flag at all?
@@ -819,9 +821,11 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
         double effectiveNewLength = newLength * lengthFactor + roadRouteBQPenalty * bqPenalty;
         route = candidateRoute;
 
-        if(useWeightedRefinement
-           && (!pathAvailable
-               || effectiveNewLength < oldLength + bqPenaltyConfig.roadRouteWeightedRefinementScoreMargin))
+        const bool shouldRefine =
+          useWeightedRefinement
+          && (policy == AlternativeRoadPolicy::BuildFirstValid || !pathAvailable
+              || effectiveNewLength < oldLength + bqPenaltyConfig.roadRouteWeightedRefinementScoreMargin);
+        if(shouldRefine)
         {
             std::vector<Direction> weightedRoute;
             unsigned weightedLength = 0;
@@ -844,7 +848,9 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
             }
         }
 
-        if(!pathAvailable || effectiveNewLength < oldLength)
+        const bool shouldBuild =
+          !pathAvailable || policy == AlternativeRoadPolicy::BuildFirstValid || effectiveNewLength < oldLength;
+        if(shouldBuild)
         {
             if(BuildRoad(flag, &curFlag, route))
             {

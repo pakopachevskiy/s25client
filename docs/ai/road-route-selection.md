@@ -228,7 +228,10 @@ nodes.
 ## Secondary Roads
 
 After a building is connected, non-military jobs may attempt a second road via
-`BuildAlternativeRoad()`.
+`BuildAlternativeRoad()`. Ordinary non-military buildings use the shortcut-only
+policy described below. Storehouses use a special policy: the AI tries to build
+the first valid secondary road to a connected nearby flag even when the new
+segment is longer than the current road-network path.
 
 This pass:
 
@@ -238,7 +241,8 @@ This pass:
   whose straight-distance lower bound cannot win can be skipped,
 - computes an unweighted new free-terrain road to that flag,
 - runs weighted refinement only when the unweighted route is close enough to
-  the build threshold, or when no current road path exists,
+  the build threshold, or when no current road path exists. Storehouses refine
+  every valid candidate when weighted refinement is enabled,
 - compares that new segment against the current road-network distance.
 
 The road is built only if:
@@ -246,8 +250,11 @@ The road is built only if:
 - no current path exists, or
 - `newLength * 5 + bqPenalty.roadRoute * routeBQPenalty < oldLength`.
 
-So secondary roads are conservative shortcuts. They are not meant to fine-tune
-every route, only to add clearly superior bypasses.
+So secondary roads for ordinary buildings are conservative shortcuts. They are
+not meant to fine-tune every route, only to add clearly superior bypasses.
+Storehouse secondary roads are intentionally less conservative and may create
+longer local loops as long as the route passes the same ownership,
+connectivity, flag-placement, and road-buildability checks.
 
 ## Important Non-Obvious Details
 

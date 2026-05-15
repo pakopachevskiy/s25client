@@ -293,7 +293,9 @@ void BuildJob::TryToBuildSecondaryRoad()
         return;
     }
 
-    if(aijh.GetConstruction().BuildAlternativeRoad(houseFlag, route))
+    const auto policy = type == BuildingType::Storehouse ? AlternativeRoadPolicy::BuildFirstValid
+                                                         : AlternativeRoadPolicy::ShortcutOnly;
+    if(aijh.GetConstruction().BuildAlternativeRoad(houseFlag, route, policy))
     {
         state = JobState::ExecutingRoad2_2;
     } else

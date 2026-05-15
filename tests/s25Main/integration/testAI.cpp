@@ -5,6 +5,7 @@
 #include "PointOutput.h"
 #include "RttrForeachPt.h"
 #include "ai/AIPlayer.h"
+#include "ai/aijh/planning/AIConstruction.h"
 #include "ai/aijh/runtime/AIPlayerJH.h"
 #include "buildings/noBuilding.h"
 #include "buildings/noBuildingSite.h"
@@ -263,6 +264,33 @@ BOOST_FIXTURE_TEST_CASE(KeepBQUpdated, BiggerWorldWithGCExecution)
     em.ExecuteNextGF();
     ai->RunGF(em.GetCurrentGF(), false);
     assertBqEqualOnWholeMap(__LINE__);
+}
+
+BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoad_ShortcutPolicyRejectsLongerRoad, WorldWithGCExecution<1>)
+{
+    const MapPoint sourceFlagPos = world.GetNeighbour(hqPos, Direction::SouthEast);
+    this->BuildRoad(sourceFlagPos, false, std::vector<Direction>(4, Direction::East));
+    const noFlag* sourceFlag = world.GetSpecObj<noFlag>(sourceFlagPos);
+    BOOST_TEST_REQUIRE(sourceFlag);
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    std::vector<Direction> route;
+    BOOST_TEST(!ai.GetConstruction().BuildAlternativeRoad(sourceFlag, route, AIJH::AlternativeRoadPolicy::ShortcutOnly));
+    BOOST_TEST(ai.FetchGameCommands().empty());
+}
+
+BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoad_StorehousePolicyBuildsLongerValidRoad, WorldWithGCExecution<1>)
+{
+    const MapPoint sourceFlagPos = world.GetNeighbour(hqPos, Direction::SouthEast);
+    this->BuildRoad(sourceFlagPos, false, std::vector<Direction>(4, Direction::East));
+    const noFlag* sourceFlag = world.GetSpecObj<noFlag>(sourceFlagPos);
+    BOOST_TEST_REQUIRE(sourceFlag);
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    std::vector<Direction> route;
+    BOOST_TEST(ai.GetConstruction().BuildAlternativeRoad(sourceFlag, route, AIJH::AlternativeRoadPolicy::BuildFirstValid));
+    BOOST_TEST(!route.empty());
+    BOOST_TEST(ai.FetchGameCommands().size() == 1u);
 }
 
 BOOST_FIXTURE_TEST_CASE(BuildWoodIndustry, WorldWithGCExecution<1>)
