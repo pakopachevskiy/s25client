@@ -21,6 +21,7 @@
 #include "nodeObjs/noGranite.h"
 #include "nodeObjs/noStaticObject.h"
 #include "nodeObjs/noTree.h"
+#include "world/BQCalculator.h"
 #include "world/GameWorld.h"
 #include "gameData/TerrainDesc.h"
 #include <algorithm>
@@ -70,6 +71,28 @@ pb::BuildingQuality ToProtoBuildingQuality(const BuildingQuality buildingQuality
         case BuildingQuality::Harbor: return pb::BUILDING_QUALITY_HARBOR;
     }
     return pb::BUILDING_QUALITY_NOTHING;
+}
+
+bool IsBuildingFlag(const GameWorld& world, const MapPoint pt)
+{
+    if(world.GetNO(pt)->GetType() != NodalObjectType::Flag)
+        return false;
+
+    const NodalObjectType northWestObjectType = world.GetNO(world.GetNeighbour(pt, Direction::NorthWest))->GetType();
+    return northWestObjectType == NodalObjectType::Building || northWestObjectType == NodalObjectType::Buildingsite;
+}
+
+BuildingQuality CalculateBuildingQualityWithoutRoadsOrStandaloneFlags(const GameWorld& world, const MapPoint pt)
+{
+    const BQCalculator calcBQ(world);
+    const auto isOnRoad = [](MapPoint) { return false; };
+    const auto getBlockingManner = [&world](const MapPoint point) {
+        const noBase* obj = world.GetNO(point);
+        if(obj->GetType() == NodalObjectType::Flag && !IsBuildingFlag(world, point))
+            return BlockingManner::None;
+        return obj->GetBM();
+    };
+    return calcBQ(pt, isOnRoad, getBlockingManner, false);
 }
 
 pb::RoadDirection ToProtoDirection(const Direction dir)
@@ -435,6 +458,8 @@ pb::BuildingQualitySnapshot ExtractBuildingQualitySnapshot(const GameWorld& worl
         }
         protoNode->set_raw_bq(static_cast<uint32_t>(node.bq));
         protoNode->set_building_quality(ToProtoBuildingQuality(node.bq));
+        protoNode->set_no_road_building_quality(
+          ToProtoBuildingQuality(CalculateBuildingQualityWithoutRoadsOrStandaloneFlags(world, pt)));
         for(unsigned playerId = 0; playerId < world.GetNumPlayers(); ++playerId)
             protoNode->add_adjusted_bq_by_player(static_cast<uint32_t>(world.GetBQ(pt, playerId)));
     }
