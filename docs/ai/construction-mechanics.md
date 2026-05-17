@@ -28,6 +28,11 @@ See also:
   the front of the deque when the caller wants immediate attention.
 - `AddConnectFlagJob` ensures each flag enters the connection queue at most once, avoiding
   redundant “hook this node up” tasks.
+- New building placement pauses once the AI has reached the configured active building-site
+  cap. The effective cap is the lower of `AIConfig::maxBuildingSites`
+  and available builder capacity plus `AIConfig::builderAdvance`; builder capacity counts
+  existing builders and hammers that can create builders. Defaults are `maxBuildingSites: 40`
+  and `builderAdvance.constant: 1`.
 
 ## Where `buildJobs` Entries Come From
 - `AIPlayerJH::AddBuildJob` is the only regular gateway into the deque; it wraps the requested

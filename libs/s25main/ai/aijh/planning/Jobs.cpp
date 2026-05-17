@@ -5,23 +5,39 @@
 #include "Jobs.h"
 #include "ai/AIEvents.h"
 #include "ai/AIInterface.h"
+#include "ai/aijh/config/AIConfig.h"
+#include "ai/aijh/config/WeightParams.h"
 #include "ai/aijh/debug/AIRuntimeProfiler.h"
 #include "ai/aijh/planning/AIConstruction.h"
 #include "ai/aijh/planning/BuildingPlanner.h"
 #include "ai/aijh/planning/PositionSearch.h"
 #include "ai/aijh/runtime/AIPlanningContext.h"
 #include "buildings/noBuildingSite.h"
+#include "GamePlayer.h"
 #include "world/GameWorldBase.h"
 #include "nodeObjs/noFlag.h"
 #include "gameData/BuildingConsts.h"
 #include "gameData/BuildingProperties.h"
+#include "gameData/JobConsts.h"
+#include "gameTypes/Inventory.h"
 #include <boost/range/adaptor/reversed.hpp>
+#include <algorithm>
 #include <optional>
 
 namespace AIJH {
 
 namespace {
 constexpr unsigned kGlobalBuildSearchCooldownGF = 500;
+
+unsigned GetMaxBuildingSites(const AIPlanningContext& aijh)
+{
+    const AIConfig& config = aijh.GetConfig();
+    const Inventory& inventory = aijh.GetPlayer().GetInventory();
+    const unsigned buildersAvailable = inventory.people[Job::Builder] + inventory.goods[JOB_CONSTS[Job::Builder].tool.get()];
+    const unsigned builderLimit =
+      buildersAvailable + static_cast<unsigned>(CALC::calcCount(buildersAvailable, config.builderAdvance));
+    return std::min(config.maxBuildingSites, builderLimit);
+}
 }
 
 AIJob::AIJob(AIPlanningContext& aijh) : aijh(aijh), state(JobState::Waiting) {}
@@ -81,7 +97,7 @@ void BuildJob::TryToBuild()
         return;
     }
 
-    if(aijh.GetInterface().GetBuildingSites().size() > 40)
+    if(aijh.GetInterface().GetBuildingSites().size() >= GetMaxBuildingSites(aijh))
     {
         return;
     }

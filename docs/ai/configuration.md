@@ -85,6 +85,13 @@ Behaviour driven by these knobs is documented in:
 - `reserveMilitaryBorderlandThreshold` – `Borderland` level above which a plot
   is treated as border-adjacent for military-slot reservation. Higher values
   mean stricter “closer to the border” filtering. The default is `150`.
+- `maxBuildingSites` – Maximum number of active building sites the AI tolerates
+  before pausing new build-job placement. The default is `40`. The effective
+  cap is also limited by available builders and `builderAdvance`.
+- `builderAdvance` – `BuildParams` gap added to available builder capacity
+  when calculating the active building-site cap. Available builder capacity is
+  existing builders plus hammers that can create builders. The default is a
+  constant `1`.
 
 ## YAML Configuration
 
@@ -103,6 +110,8 @@ following top-level sections if present:
 | `bqPenalty` | Map with `buildLocation`, `roadRoute`, and `roadRouteQualityValues` controlling BQ-related penalties in site and road scoring. |
 | `reserveMilitaryBorderSlots` | Boolean toggle for preserving border plots that are suitable for military expansion from non-military placement. |
 | `reserveMilitaryBorderlandThreshold` | Unsigned cutoff for `AIResource::Borderland`; plots above this level are treated as border-adjacent for the reservation rule. |
+| `maxBuildingSites` | Unsigned absolute cap for active AI building sites before construction jobs pause. |
+| `builderAdvance` | `BuildParams` gap added to builder capacity for the effective building-site cap. |
 
 Invalid entries log warnings but leave defaults untouched. Player-specific
 overrides can be loaded with `ApplyPlayerWeightsCfg`, which stores a dedicated
@@ -140,6 +149,10 @@ bqPenalty:
     Mine: 3.0
     Castle: 7.0
     Harbor: 7.0
+
+maxBuildingSites: 40
+builderAdvance:
+  constant: 1
 ```
 
 With these settings:
@@ -164,5 +177,7 @@ With these settings:
 - `troopsDistribution.frontierMultipliers` defaults to `1.0` for every
   frontier distance.
 - `reserveMilitaryBorderSlots` defaults to `true`.
+- `maxBuildingSites` defaults to `40`.
+- `builderAdvance` defaults to `constant: 1`.
 - `disableBuilding` defaults to an empty list; omitting it in YAML preserves the
   original behaviour where all buildings start enabled.

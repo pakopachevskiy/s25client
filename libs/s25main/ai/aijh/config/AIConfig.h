@@ -72,6 +72,8 @@ struct AIConfig
     TroopsDistributionConfig troopsDistribution;
     bool reserveMilitaryBorderSlots = true;
     unsigned reserveMilitaryBorderlandThreshold = 150;
+    unsigned maxBuildingSites = 40;
+    BuildParams builderAdvance = {3};
     std::vector<BuildingType> disableBuilding;
     helpers::EnumArray<signed, Tool> toolPriority = TOOL_PRIORITY;
 

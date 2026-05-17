@@ -741,6 +741,27 @@ extern void applyWeightsCfg(std::string weightCfgPath, AIConfig& targetConfig)
                           << e.what() << std::endl;
             }
         }
+        if(const YAML::Node value = rootNode["maxBuildingSites"])
+        {
+            try
+            {
+                targetConfig.maxBuildingSites = value.as<unsigned>();
+            } catch(const YAML::TypedBadConversion<unsigned>& e)
+            {
+                std::cerr << "Warning: Invalid maxBuildingSites value, using default. Error: " << e.what()
+                          << std::endl;
+            }
+        }
+        if(const YAML::Node value = rootNode["builderAdvance"])
+        {
+            try
+            {
+                targetConfig.builderAdvance = Weights::parseBuildParams(value, targetConfig.builderAdvance);
+            } catch(const YAML::Exception& e)
+            {
+                std::cerr << "Warning: Invalid builderAdvance value, using default. Error: " << e.what() << std::endl;
+            }
+        }
         if(const YAML::Node value = rootNode["bqPenaltyPerLevel"])
         {
             try

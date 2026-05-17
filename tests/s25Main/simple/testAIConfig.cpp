@@ -16,6 +16,13 @@ BOOST_AUTO_TEST_CASE(TroopsDistributionStrategy_DefaultsToFair)
                == static_cast<int>(TroopsDistributionStrategy::Fair));
 }
 
+BOOST_AUTO_TEST_CASE(MaxBuildingSites_DefaultsToForty)
+{
+    const AIConfig config;
+    BOOST_TEST(config.maxBuildingSites == 40u);
+    BOOST_TEST(config.builderAdvance.constant == 1.0);
+}
+
 BOOST_AUTO_TEST_CASE(BQPenaltyConfig_DefaultRoadRouteQualityValues)
 {
     const AIConfig config;
@@ -78,6 +85,26 @@ BOOST_AUTO_TEST_CASE(TroopsDistributionStrategy_CanBeParsed)
     BOOST_TEST(config.troopsDistribution.frontierMultipliers[FrontierDistance::Mid] == 0.9);
     BOOST_TEST(config.troopsDistribution.frontierMultipliers[FrontierDistance::Far] == 1.0);
     BOOST_TEST(config.troopsDistribution.frontierMultipliers[FrontierDistance::Harbor] == 1.0);
+}
+
+BOOST_AUTO_TEST_CASE(MaxBuildingSites_CanBeParsed)
+{
+    const std::string configPath = "/tmp/rttr-ai-max-building-sites.yaml";
+    {
+        std::ofstream out(configPath);
+        BOOST_TEST_REQUIRE(out.good());
+        out << "maxBuildingSites: 17\n";
+        out << "builderAdvance:\n";
+        out << "  constant: 3\n";
+        out << "  linear: 0.5\n";
+    }
+
+    AIConfig config;
+    applyWeightsCfg(configPath, config);
+
+    BOOST_TEST(config.maxBuildingSites == 17u);
+    BOOST_TEST(config.builderAdvance.constant == 3.0);
+    BOOST_TEST(config.builderAdvance.linear == 0.5);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
