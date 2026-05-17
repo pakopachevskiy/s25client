@@ -16,6 +16,7 @@
 #include "buildings/nobUsual.h"
 #include "gameData/BuildingProperties.h"
 #include "helpers/EnumRange.h"
+#include "gameTypes/BuildingQuality.h"
 #include "nodeObjs/noFlag.h"
 #include "nodeObjs/noGranite.h"
 #include "nodeObjs/noStaticObject.h"
@@ -44,12 +45,31 @@ static_assert(static_cast<int>(BuildingType::Storehouse) + 1 == pb::BUILDING_TYP
               "BuildingType proto enum no longer matches engine ordinals");
 static_assert(static_cast<int>(BuildingType::HarborBuilding) + 1 == pb::BUILDING_TYPE_HARBOR_BUILDING,
               "BuildingType proto enum no longer matches engine ordinals");
+static_assert(static_cast<int>(BuildingQuality::Nothing) == pb::BUILDING_QUALITY_NOTHING,
+              "BuildingQuality proto enum no longer matches engine ordinals");
+static_assert(static_cast<int>(BuildingQuality::Harbor) == pb::BUILDING_QUALITY_HARBOR,
+              "BuildingQuality proto enum no longer matches engine ordinals");
 
 pb::BuildingType ToProtoBuildingType(const BuildingType buildingType)
 {
     if(!BuildingProperties::IsValid(buildingType))
         return pb::BUILDING_TYPE_UNSPECIFIED;
     return static_cast<pb::BuildingType>(static_cast<int>(buildingType) + 1);
+}
+
+pb::BuildingQuality ToProtoBuildingQuality(const BuildingQuality buildingQuality)
+{
+    switch(buildingQuality)
+    {
+        case BuildingQuality::Nothing: return pb::BUILDING_QUALITY_NOTHING;
+        case BuildingQuality::Flag: return pb::BUILDING_QUALITY_FLAG;
+        case BuildingQuality::Mine: return pb::BUILDING_QUALITY_MINE;
+        case BuildingQuality::Hut: return pb::BUILDING_QUALITY_HUT;
+        case BuildingQuality::House: return pb::BUILDING_QUALITY_HOUSE;
+        case BuildingQuality::Castle: return pb::BUILDING_QUALITY_CASTLE;
+        case BuildingQuality::Harbor: return pb::BUILDING_QUALITY_HARBOR;
+    }
+    return pb::BUILDING_QUALITY_NOTHING;
 }
 
 pb::RoadDirection ToProtoDirection(const Direction dir)
@@ -414,6 +434,7 @@ pb::BuildingQualitySnapshot ExtractBuildingQualitySnapshot(const GameWorld& worl
             protoNode->set_blocking_go_type(static_cast<uint32_t>(obj->GetGOT()));
         }
         protoNode->set_raw_bq(static_cast<uint32_t>(node.bq));
+        protoNode->set_building_quality(ToProtoBuildingQuality(node.bq));
         for(unsigned playerId = 0; playerId < world.GetNumPlayers(); ++playerId)
             protoNode->add_adjusted_bq_by_player(static_cast<uint32_t>(world.GetBQ(pt, playerId)));
     }
