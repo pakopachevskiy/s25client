@@ -180,26 +180,26 @@ void GameWorld::SetBuildingSite(const BuildingType type, const MapPoint pt, cons
 
 void GameWorld::DestroyBuilding(const MapPoint pt, const unsigned char player)
 {
-    // Steht da auch ein Gebäude oder eine Baustelle, nicht dass wir aus Verzögerung Feuer abreißen wollen, das geht
-    // schief
+    // Is there actually a building or building site there? We must not demolish fire due to a delay, that would go
+    // wrong.
     if(GetNO(pt)->GetType() == NodalObjectType::Building || GetNO(pt)->GetType() == NodalObjectType::Buildingsite)
     {
         auto* nbb = GetSpecObj<noBaseBuilding>(pt);
 
-        // Ist das Gebäude auch von dem Spieler, der es abreißen will?
+        // Does the building also belong to the player who wants to demolish it?
         if(nbb->GetPlayer() != player)
             return;
 
-        // Militärgebäude?
+        // Military building?
         if(nbb->GetGOT() == GO_Type::NobMilitary)
         {
-            // Darf das Gebäude abgerissen werden?
+            // May the building be demolished?
             if(!static_cast<nobMilitary*>(nbb)->IsDemolitionAllowed())
                 return;
         }
 
         DestroyNO(pt);
-        // Bauplätze drumrum neu berechnen
+        // Recalculate surrounding building sites
         RecalcBQAroundPointBig(pt);
     }
 }

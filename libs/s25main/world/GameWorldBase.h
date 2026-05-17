@@ -48,7 +48,7 @@ constexpr Direction toDirection(const RoadDir roadDir) noexcept
     return Direction(rttr::enum_cast(roadDir) + 3u);
 }
 
-/// Grundlegende Klasse, die die Gamewelt darstellt, enth�lt nur deren Daten
+/// Basic class that represents the game world, contains only its data
 class GameWorldBase : public World
 {
     std::unique_ptr<RoadPathFinder> roadPathFinder;
@@ -64,7 +64,7 @@ class GameWorldBase : public World
     LuaInterfaceGame* lua;
 
 protected:
-    /// Interface zum GUI
+    /// Interface to the GUI
     GameInterface* gi;
     std::unique_ptr<EconomyModeHandler> econHandler;
     std::unique_ptr<TradePathCache> tradePathCache;
@@ -73,7 +73,7 @@ public:
     GameWorldBase(std::vector<GamePlayer> players, const GlobalGameSettings& gameSettings, EventManager& em);
     ~GameWorldBase() override;
 
-    // Grundlegende Initialisierungen
+    // Basic initializations
     void Init(const MapExtent& mapSize, DescIdx<LandscapeDesc> lt = DescIdx<LandscapeDesc>(0)) override;
     /// Create Trade graphs
     virtual void CreateTradeGraphs() = 0;
@@ -97,16 +97,16 @@ public:
     /// Check if a flag is at a neighbour node
     bool IsFlagAround(const MapPoint& pt) const;
 
-    /// Berechnet BQ bei einer gebauten Stra�e
+    /// Recalculates BQ for a built road
     void RecalcBQForRoad(MapPoint pt);
-    /// Pr�ft, ob sich in unmittelbarer N�he (im Radius von 4) Milit�rgeb�ude befinden
+    /// Checks whether military buildings are nearby (within a radius of 4)
     bool IsMilitaryBuildingNearNode(MapPoint nPt, unsigned char player) const;
     /// Return true if there is a military building or building site on the node
     /// If attackBldsOnly is true, then only troop buildings are returned
     /// Otherwise it includes e.g. HQ and harbour which cannot attack itself but hold land
     bool IsMilitaryBuildingOnNode(MapPoint pt, bool attackBldsOnly) const;
-    /// Erstellt eine Liste mit allen Milit�rgeb�uden in der Umgebung, radius bestimmt wie viele K�stchen nach einer
-    /// Richtung im Umkreis
+    /// Creates a list with all military buildings in the area, radius determines how many tiles in each direction are
+    /// included
     sortedMilitaryBlds LookForMilitaryBuildings(MapPoint pt, unsigned short radius) const;
 
     /// Finds a path for figures. Returns first direction to walk in if found
@@ -131,23 +131,23 @@ public:
     /// Gets the (height adjusted) global coordinates of the node (e.g. for drawing)
     Position GetNodePos(MapPoint pt) const;
 
-    /// Berechnet Bauqualitäten an Punkt x;y und den ersten Kreis darum neu
+    /// Recalculates building qualities at point x;y and the first ring around it
     void RecalcBQAroundPoint(MapPoint pt);
-    /// Berechnet Bauqualitäten wie bei letzterer Funktion, bloß noch den 2. Kreis um x;y herum
+    /// Recalculates building qualities as in the previous function, but also the second ring around x;y
     void RecalcBQAroundPointBig(MapPoint pt);
 
-    /// Ermittelt Sichtbarkeit eines Punktes auch unter Einbeziehung der Verbündeten des jeweiligen Spielers
+    /// Determines visibility of a point, also including the respective player's allies
     Visibility CalcVisiblityWithAllies(MapPoint pt, unsigned char player) const;
 
-    /// Ist es an dieser Stelle für einen Spieler möglich einen Hafen zu bauen
+    /// Is it possible for a player to build a harbor at this place
     bool IsHarborPointFree(unsigned harborId, unsigned char player) const;
-    /// Ermittelt, ob ein Punkt Küstenpunkt ist, d.h. Zugang zu einem schiffbaren Meer, an dem auch mindestens 1
-    /// Hafenplatz liegt, hat und gibt ggf. die Meeres-ID zurück, ansonsten 0
+    /// Determines whether a point is a coastal point, i.e. has access to a navigable sea with at least one harbor site,
+    /// and returns the sea ID if so, otherwise 0
     bool IsCoastalPointToSeaWithHarbor(MapPoint pt) const;
-    /// Sucht freie Hafenpunkte, also wo noch ein Hafen gebaut werden kann
+    /// Searches for free harbor points where a harbor can still be built
     unsigned GetNextFreeHarborPoint(MapPoint pt, unsigned origin_harborId, const ShipDirection& dir,
                                     unsigned char player) const;
-    /// Bestimmt für einen beliebigen Punkt auf der Karte die Entfernung zum nächsten Hafenpunkt
+    /// Determines the distance to the nearest harbor point for any point on the map
     unsigned CalcDistanceToNearestHarbor(MapPoint pos) const;
     /// returns true when a harborpoint is in SEAATTACK_DISTANCE for figures!
     bool IsAHarborInSeaAttackDistance(MapPoint pos) const;
@@ -180,11 +180,11 @@ public:
             CmpSoldier(nofPassiveSoldier* const search) : search(search) {}
             bool operator()(const PotentialSeaAttacker& other) const { return other.soldier == search; }
         };
-        /// Soldat, der als Angreifer in Frage kommt
+        /// Soldier that is a candidate attacker
         nofPassiveSoldier* soldier;
-        /// Hafen, den der Soldat zuerst ansteuern soll
+        /// Harbor the soldier should head for first
         nobHarborBuilding* harbor;
-        /// Entfernung Hafen-Hafen (entscheidende)
+        /// Harbor-to-harbor distance (decisive)
         unsigned distance;
 
         PotentialSeaAttacker(nofPassiveSoldier* soldier, nobHarborBuilding* harbor, unsigned distance)
@@ -192,7 +192,7 @@ public:
         {}
     };
 
-    /// Liefert Hafenpunkte im Umkreis von einem bestimmten Milit�rgeb�ude
+    /// Returns harbor points within range of a specific military building
     std::vector<unsigned> GetHarborPointsAroundMilitaryBuilding(MapPoint pt) const;
     /// Return all harbor Ids that can be used as a landing site for attacking the given point
     /// Sets all entries in @param use_seas to true, if the given sea can be used for attacking (seaId=1 -> Index 0 as

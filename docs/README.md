@@ -120,6 +120,8 @@ platform support, and optional sanitizers for development builds.
   pipeline and heuristics.
 - [Construction mechanics](ai/construction-mechanics.md) – Queueing and
   deduplication of AI construction work.
+- [Wanted building counts](ai/wanted-building-counts.md) – How the AI estimates
+  target building counts before queueing construction.
 - [Road route selection](ai/road-route-selection.md) – How the AI scores
   nearby flag connections and picks new road segments.
 - [Position finding](ai/position-finding.md) – Finder logic for strategic
@@ -151,3 +153,5 @@ platform support, and optional sanitizers for development builds.
   CLI options, outputs, stats periods, and event logger controls.
 - [Data extractor](tools/data-extractor.md) – Snapshot generation and exported
   data formats.
+- [Quantity extractor](tools/quantity-extractor.md) – Savegame-to-protobuf
+  snapshots for building locations, roads, and blocking environment objects.

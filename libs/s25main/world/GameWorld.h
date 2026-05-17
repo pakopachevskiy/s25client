@@ -30,7 +30,7 @@ enum class TerritoryChangeReason
     Captured   /// Owner changed
 };
 
-/// "Interface-Klasse" für das Spiel
+/// "Interface class" for the game
 class GameWorld : public GameWorldBase
 {
     /// Destroys player belongings if that pint does not belong to the player anymore
@@ -46,11 +46,11 @@ class GameWorld : public GameWorldBase
     bool IsScoutingFigureOnNode(const MapPoint& pt, unsigned player, unsigned distance) const;
     /// Return true, if the point is explored by any ship of the player
     bool IsPointScoutedByShip(const MapPoint& pt, unsigned player) const;
-    /// Berechnet die Sichtbarkeit eines Punktes neu für den angegebenen Spieler
-    /// exception ist ein Gebäude (Spähturm, Militärgebäude), was nicht mit in die Berechnung einbezogen
-    /// werden soll, z.b. weil es abgerissen wird
+    /// Recalculates the visibility of a point for the given player
+    /// exception is a building (lookout tower, military building) that should not be included in the calculation,
+    /// for example because it is being demolished
     void RecalcVisibility(MapPoint pt, unsigned char player, const noBaseBuilding* exception);
-    /// Setzt Punkt auf jeden Fall auf sichtbar
+    /// Always sets the point to visible
     void MakeVisible(MapPoint pt, unsigned char player);
 
     /// Creates a region with territories marked around a building with the given radius
@@ -65,29 +65,29 @@ public:
     GameWorld(const std::vector<PlayerInfo>& players, const GlobalGameSettings& gameSettings, EventManager& em);
     ~GameWorld() override;
 
-    /// Stellt anderen Spielern/Spielobjekten das Game-GUI-Interface zur Verfüung
+    /// Provides the game GUI interface to other players/game objects
     GameInterface* GetGameInterface() const { return gi; }
     TradePathCache& GetTradePathCache();
     void setEconHandler(std::unique_ptr<EconomyModeHandler> handler);
 
-    /// Kann dieser Punkt von auf Straßen laufenden Menschen betreten werden? (Kämpfe!)
+    /// Can this point be entered by people walking on roads? (fights!)
     bool IsRoadNodeForFigures(MapPoint pt);
-    /// Lässt alle Figuren, die auf diesen Punkt  auf Wegen zulaufen, anhalten auf dem Weg (wegen einem Kampf)
+    /// Stops all figures on roads that are moving toward this point (because of a fight)
     void StopOnRoads(MapPoint pt, helpers::OptionalEnum<Direction> dir = boost::none);
 
-    /// Sagt Bescheid, dass der Punkt wieder freigeworden ist und lässt ggf. Figuren drumherum wieder weiterlaufen
+    /// Notifies that the point is available again and lets nearby figures continue moving if necessary
     void RoadNodeAvailable(MapPoint pt);
 
     /// Place a flag for the player specific
     void SetFlag(MapPoint pt, unsigned char player,
                  RoadEventLogger::FlagBuildReason reason = RoadEventLogger::FlagBuildReason::Manual);
-    /// Flagge soll zerstrört werden
+    /// Flag should be destroyed
     void DestroyFlag(MapPoint pt, unsigned char playerId,
                      RoadEventLogger::FlagDemolitionReason reason = RoadEventLogger::FlagDemolitionReason::Manual,
                      unsigned initiatorPlayerId = 0);
-    /// Baustelle setzen
+    /// Place a building site
     void SetBuildingSite(BuildingType type, MapPoint pt, unsigned char player);
-    /// Gebäude bzw Baustelle abreißen
+    /// Demolish a building or building site
     void DestroyBuilding(MapPoint pt, unsigned char player);
 
     /// Find a path for people using roads.
@@ -97,7 +97,7 @@ public:
     RoadPathDirection FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& goal,
                                              unsigned* length = nullptr, MapPoint* firstPt = nullptr,
                                              unsigned max = std::numeric_limits<unsigned>::max());
-    /// Prüft, ob eine Schiffsroute noch Gültigkeit hat
+    /// Checks whether a ship route is still valid
     bool CheckShipRoute(MapPoint start, const std::vector<Direction>& route, unsigned pos, MapPoint* dest);
     /// Find a route for trade caravanes
     helpers::OptionalEnum<Direction> FindTradePath(MapPoint start, MapPoint dest, unsigned char player,
@@ -109,17 +109,17 @@ public:
     bool CheckTradeRoute(MapPoint start, const std::vector<Direction>& route, unsigned pos, unsigned char player,
                          MapPoint* dest = nullptr) const;
 
-    /// setzt den Straßen-Wert um den Punkt X,Y.
+    /// Sets the road value around the point X,Y.
     void SetPointRoad(MapPoint pt, Direction dir, PointRoad type);
 
-    /// Baut eine Straße ( nicht nur visuell, sondern auch wirklich )
+    /// Builds a road (not only visually, but really)
     void BuildRoad(unsigned char playerId, bool boat_road, MapPoint start, const std::vector<Direction>& route);
 
     /// Recalculates the ownership around a military building
     void RecalcTerritory(const noBaseBuilding& building, TerritoryChangeReason reason);
 
-    /// Berechnet das Land in einem bestimmten Bereich um ein aktuelles Militärgebäude rum neu und gibt zurück ob sich
-    /// etwas verändern würde (auf für ki wichtigem untergrund) wenn das Gebäude zerstört werden würde
+    /// Recalculates the land in a certain area around a current military building and returns whether anything would
+    /// change (on ground important to the AI) if the building were destroyed
     bool DoesDestructionChangeTerritory(const noBaseBuilding& building) const;
     /// Return the building types that would be destroyed if the given military building were captured
     std::vector<BuildingType> GetBuildingsLostOnCapture(const nobMilitary& building) const;
@@ -130,38 +130,38 @@ public:
     /// Refresh capture risk and importance for all military buildings
     void UpdateMilitaryRiskEstimates();
 
-    /// Greift ein Militärgebäude auf x,y an (entsendet dafür die Soldaten etc.)
+    /// Attacks a military building at x,y (dispatches the soldiers for it, etc.)
     void Attack(unsigned char player_attacker, MapPoint pt, unsigned short soldiers_count, bool strong_soldiers);
-    /// Greift ein Militäregebäude mit Schiffen an
+    /// Attacks a military building with ships
     void AttackViaSea(unsigned char player_attacker, MapPoint pt, unsigned short soldiers_count, bool strong_soldiers);
 
     MilitarySquares& GetMilitarySquares();
 
-    /// Lässt alles spielerische abbrennen, indem es alle Flaggen der Spieler zerstört
+    /// Burns down everything player-owned by destroying all player flags
     void Armageddon();
 
-    /// Lässt alles spielerische eines Spielers abbrennen, indem es alle Flaggen eines Spieler zerstört
+    /// Burns down everything owned by one player by destroying all flags of that player
     void Armageddon(unsigned char player);
 
-    /// Ist der Punkt ein geeigneter Platz zum Warten vor dem Militärgebäude
+    /// Is the point a suitable place to wait in front of the military building
     bool ValidWaitingAroundBuildingPoint(MapPoint pt, MapPoint center);
     /// Is this point a valid point for the given soldier to fight?
     bool IsValidPointForFighting(MapPoint pt, const nofActiveSoldier& soldier, bool avoid_military_building_flags);
 
-    /// Berechnet die Sichtbarkeiten neu um einen Punkt mit radius
+    /// Recalculates visibility around a point with radius
     void RecalcVisibilitiesAroundPoint(MapPoint pt, MapCoord radius, unsigned char player,
                                        const noBaseBuilding* exception);
-    /// Setzt die Sichtbarkeiten um einen Punkt auf sichtbar (aus Performancegründen Alternative zu oberem)
+    /// Sets visibility around a point to visible (performance alternative to the above)
     void MakeVisibleAroundPoint(MapPoint pt, MapCoord radius, unsigned char player);
-    /// Bestimmt bei der Bewegung eines spähenden Objekts die Sichtbarkeiten an den Rändern neu
+    /// Recalculates visibility at the edges when a scouting object moves
     void RecalcMovingVisibilities(MapPoint pt, unsigned char player, MapCoord radius, Direction moving_dir,
                                   MapPoint* enemy_territory);
 
     /// Return whether this is a border node (node belongs to player, but not all others around)
     bool IsBorderNode(MapPoint pt, unsigned char owner) const;
 
-    // Konvertiert Ressourcen zwischen Typen hin und her oder löscht sie.
-    // Für Spiele ohne Gold.
+    // Converts resources between types or deletes them.
+    // For games without gold.
     void ConvertMineResourceTypes(ResourceType from, ResourceType to);
     // Setup resources like gold and water after loading a new map
     void SetupResources();
@@ -169,18 +169,18 @@ public:
     // Fills water depending on terrain and Addon setting
     void PlaceAndFixWater();
 
-    /// Gründet vom Schiff aus eine neue Kolonie, gibt true zurück bei Erfolg
+    /// Founds a new colony from a ship, returns true on success
     bool FoundColony(unsigned harbor_point, unsigned char player, unsigned short seaId);
-    /// Registriert eine Baustelle eines Hafens, die vom Schiff aus gesetzt worden ist
+    /// Registers a harbor building site that was placed from a ship
     void AddHarborBuildingSiteFromSea(noBuildingSite* building_site)
     {
         harbor_building_sites_from_sea.push_back(building_site);
     }
     /// Removes it. It is allowed to be called with a regular harbor building site (no-op in that case)
     void RemoveHarborBuildingSiteFromSea(noBuildingSite* building_site);
-    /// Gibt zurück, ob eine bestimmte Baustellen eine Baustelle ist, die vom Schiff aus errichtet wurde
+    /// Returns whether a specific building site is a building site that was built from a ship
     bool IsHarborBuildingSiteFromSea(const noBuildingSite* building_site) const;
-    /// Liefert eine Liste der Hafenpunkte, die von einem bestimmten Hafenpunkt erreichbar sind
+    /// Returns a list of harbor points reachable from a specific harbor point
     std::vector<unsigned> GetUnexploredHarborPoints(unsigned hbIdToSkip, unsigned seaId, unsigned playerId) const;
 
     /// Writeable access to node. Use only for initial map setup!
