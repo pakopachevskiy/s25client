@@ -19,12 +19,16 @@ The tool writes:
 - `road_locations.pb` (`RoadLocationsFile`)
 - `environment_snapshot.pb` (`EnvironmentSnapshotFile`)
 - `building_quality_snapshot.pb` (`BuildingQualitySnapshot`)
+- `players.json`
 
-All files set `schema_version` to `quantity-extractor/v1` and `gameframe` to
-the savegame start frame. Road, environment, and `BuildingQualitySnapshot`
-outputs also include map width and height.
+All protobuf files set `schema_version` to `quantity-extractor/v1` and
+`gameframe` to the savegame start frame. Road, environment, and
+`BuildingQualitySnapshot` outputs also include map width and height.
 
-Player IDs use the engine convention: zero-based player slots.
+Player IDs in `building_locations.pb`, `road_locations.pb`, and `players.json`
+are exported as one-based IDs. In `building_quality_snapshot.pb`, `owner_id`
+uses the same convention, with `0` reserved for neutral map nodes. The
+`adjusted_bq_by_player` array remains indexed by zero-based engine player slot.
 
 ## Notes
 

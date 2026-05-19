@@ -1,8 +1,6 @@
 # BuildingQualitySnapshot Usage
 
 
-```
-
 `nodes.size()` should equal `map_width * map_height`.
 
 ## Enum Values

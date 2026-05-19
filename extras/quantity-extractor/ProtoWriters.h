@@ -7,8 +7,11 @@
 #include "QuantityExtractor.h"
 #include <boost/filesystem/path.hpp>
 
+class Game;
+
 namespace QuantityExtractor {
 
 void WriteSnapshotFiles(const SnapshotFiles& snapshots, const boost::filesystem::path& outputDir);
+void WritePlayersMetadata(const Game& game, const boost::filesystem::path& outputDir);
 
 } // namespace QuantityExtractor

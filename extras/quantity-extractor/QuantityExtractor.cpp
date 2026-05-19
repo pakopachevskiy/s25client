@@ -51,6 +51,11 @@ static_assert(static_cast<int>(BuildingQuality::Nothing) == pb::BUILDING_QUALITY
 static_assert(static_cast<int>(BuildingQuality::Harbor) == pb::BUILDING_QUALITY_HARBOR,
               "BuildingQuality proto enum no longer matches engine ordinals");
 
+uint32_t ToOutputPlayerId(const unsigned playerId)
+{
+    return static_cast<uint32_t>(playerId + 1u);
+}
+
 pb::BuildingType ToProtoBuildingType(const BuildingType buildingType)
 {
     if(!BuildingProperties::IsValid(buildingType))
@@ -212,7 +217,7 @@ pb::BuildingLocationsFile ExtractBuildings(const GameWorld& world, const unsigne
         std::sort(siteRecords.begin(), siteRecords.end(), ByConstructionSiteIdentity);
 
         pb::PlayerBuildingLocations* protoPlayer = file.add_players();
-        protoPlayer->set_player_id(static_cast<uint32_t>(player.GetPlayerId()));
+        protoPlayer->set_player_id(ToOutputPlayerId(player.GetPlayerId()));
 
         for(const BuildingType type : helpers::enumRange<BuildingType>())
         {
@@ -289,7 +294,7 @@ bool ByRoadIdentity(const RoadRecord& lhs, const RoadRecord& rhs)
 RoadRecord ToRoadRecord(const RoadSegment& road)
 {
     const noRoadNode* ownerNode = road.GetF1() ? road.GetF1() : road.GetF2();
-    const uint32_t playerId = ownerNode ? static_cast<uint32_t>(ownerNode->GetPlayer()) : 0u;
+    const uint32_t playerId = ownerNode ? ToOutputPlayerId(ownerNode->GetPlayer()) : 0u;
     const MapPoint start = road.GetF1() ? road.GetF1()->GetPos() : MapPoint(0, 0);
     const MapPoint end = road.GetF2() ? road.GetF2()->GetPos() : MapPoint(0, 0);
 
@@ -338,10 +343,13 @@ pb::RoadLocationsFile ExtractRoads(const GameWorld& world, const unsigned gamefr
     for(unsigned playerId = 0; playerId < world.GetNumPlayers(); ++playerId)
     {
         if(world.GetPlayer(playerId).isUsed())
-            roadsByPlayer.emplace(static_cast<uint32_t>(playerId), std::map<pb::RoadLogType, std::vector<RoadRecord>>{});
+            roadsByPlayer.emplace(ToOutputPlayerId(playerId), std::map<pb::RoadLogType, std::vector<RoadRecord>>{});
     }
     for(const RoadRecord& road : roads)
-        roadsByPlayer[road.playerId][road.roadType].push_back(road);
+    {
+        if(road.playerId != 0u)
+            roadsByPlayer[road.playerId][road.roadType].push_back(road);
+    }
 
     for(const auto& playerEntry : roadsByPlayer)
     {

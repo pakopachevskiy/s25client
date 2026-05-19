@@ -143,8 +143,9 @@ int main(int argc, char** argv)
         const QuantityExtractor::SnapshotFiles snapshots =
           QuantityExtractor::ExtractSnapshots(*loadedGame.game, loadedGame.gameframe);
         QuantityExtractor::WriteSnapshotFiles(snapshots, parsedArgs.outputDir);
+        QuantityExtractor::WritePlayersMetadata(*loadedGame.game, parsedArgs.outputDir);
 
-        bnw::cout << "Wrote quantity snapshot protobufs to " << parsedArgs.outputDir.string() << '\n';
+        bnw::cout << "Wrote quantity snapshot files to " << parsedArgs.outputDir.string() << '\n';
     } catch(const std::exception& e)
     {
         bnw::cerr << e.what() << '\n';
