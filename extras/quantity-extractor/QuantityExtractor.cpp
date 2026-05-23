@@ -125,6 +125,13 @@ pb::RoadLogType ToProtoRoadType(const RoadType roadType)
     return pb::ROAD_LOG_TYPE_UNSPECIFIED;
 }
 
+bool IsRoadSnapshotSegment(const RoadSegment& road)
+{
+    // Building entrance segments end at the building tile; only flag-to-flag roads belong in road_locations.pb.
+    return road.GetF1() && road.GetF2() && road.GetF1()->GetGOT() == GO_Type::Flag
+           && road.GetF2()->GetGOT() == GO_Type::Flag;
+}
+
 struct BuildingRecord
 {
     BuildingType type;
@@ -336,7 +343,10 @@ pb::RoadLocationsFile ExtractRoads(const GameWorld& world, const unsigned gamefr
     std::vector<RoadRecord> roads;
     roads.reserve(uniqueRoads.size());
     for(const RoadSegment* road : uniqueRoads)
-        roads.push_back(ToRoadRecord(*road));
+    {
+        if(IsRoadSnapshotSegment(*road))
+            roads.push_back(ToRoadRecord(*road));
+    }
     std::sort(roads.begin(), roads.end(), ByRoadIdentity);
 
     std::map<uint32_t, std::map<pb::RoadLogType, std::vector<RoadRecord>>> roadsByPlayer;

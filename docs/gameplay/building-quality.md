@@ -20,11 +20,6 @@ buildings.
 
 ## Raw Node Quality
 
-The raw quality stored in `MapNode::bq` is recalculated by
-`GameWorldBase::RecalcBQ()` using `BQCalculator`
-(`libs/s25main/world/BQCalculator.h`).  This raw value depends on terrain,
-altitude, objects, roads, and harbor metadata.  It does not by itself mean a
-specific player can build there; ownership is applied later.
 
 The calculator treats the selected map point as the building position.  A
 normal building's front flag is on the `SouthEast` neighbour.  Large

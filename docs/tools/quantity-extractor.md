@@ -13,22 +13,24 @@ The directory is created when it does not exist.
 
 ## Output Files
 
-The tool writes deterministic binary protobuf files:
+The tool writes:
 
 - `building_locations.pb`: `BuildingLocationsFile`
 - `road_locations.pb`: `RoadLocationsFile`
 - `environment_snapshot.pb`: `EnvironmentSnapshotFile`
 - `building_quality_snapshot.pb`: `BuildingQualitySnapshot`
+- `players.json`: player metadata
 
-All files use `schema_version = "quantity-extractor/v1"` and `gameframe` from
-the savegame start frame. Road, environment, and building-quality input
-snapshots also include `map_width` and `map_height`.
+All protobuf files use `schema_version = "quantity-extractor/v1"` and
+`gameframe` from the savegame start frame. Road, environment, and
+building-quality input snapshots also include `map_width` and `map_height`.
 
 ## Player IDs
 
-Player IDs are exported with the engine convention: zero-based player slots.
-This differs from the event-log comments in `road_log.proto`, where road events
-use one-based owner IDs.
+Player IDs in `building_locations.pb`, `road_locations.pb`, and `players.json`
+are exported as one-based IDs. In `building_quality_snapshot.pb`, `owner_id`
+uses the same convention, with `0` reserved for neutral map nodes.
+`adjusted_bq_by_player` remains indexed by zero-based engine player slot.
 
 ## Known Zero Fields
 
