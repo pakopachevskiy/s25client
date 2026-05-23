@@ -10,6 +10,7 @@
 #include "ai/aijh/planning/Jobs.h"
 #include "controls/ctrlComboBox.h"
 #include "controls/ctrlMultiline.h"
+#include "GamePlayer.h"
 #include "helpers/EnumArray.h"
 #include "helpers/EnumRange.h"
 #include "helpers/toString.h"
@@ -17,6 +18,7 @@
 #include "ogl/glFont.h"
 #include "world/GameWorldView.h"
 #include "gameData/BuildingConsts.h"
+#include "gameData/GoodConsts.h"
 #include "gameData/const_gui_ids.h"
 #include "s25util/colors.h"
 #include <algorithm>
@@ -38,20 +40,37 @@ enum
 
 constexpr unsigned OVERLAY_POSITION_RATING = 13;
 constexpr unsigned OVERLAY_BUILDINGS_WANTED = 14;
+constexpr unsigned OVERLAY_INVENTORY = 15;
 constexpr unsigned BUILDINGS_WANTED_DISABLED = std::numeric_limits<unsigned>::max();
+
+std::vector<std::pair<std::string, BuildingType>> GetSortedBuildingTypes()
+{
+    std::vector<std::pair<std::string, BuildingType>> buildingTypes;
+    for(const BuildingType type : helpers::enumRange<BuildingType>())
+    {
+        if(BUILDING_SIZE[type] != BuildingQuality::Nothing)
+            buildingTypes.emplace_back(BUILDING_NAMES[type], type);
+    }
+    std::sort(buildingTypes.begin(), buildingTypes.end(),
+              [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
+    return buildingTypes;
+}
 
 BuildingType GetBuildingTypeFromSelection(const unsigned selection)
 {
-    unsigned index = 0;
-    for(const BuildingType type : helpers::enumRange<BuildingType>())
-    {
-        if(BUILDING_SIZE[type] == BuildingQuality::Nothing)
-            continue;
-        if(index == selection)
-            return type;
-        ++index;
-    }
+    const auto buildingTypes = GetSortedBuildingTypes();
+    if(selection < buildingTypes.size())
+        return buildingTypes[selection].second;
     return BuildingType::Headquarters;
+}
+
+std::vector<std::pair<std::string, GoodType>> GetSortedGoodTypes()
+{
+    std::vector<std::pair<std::string, GoodType>> goodTypes;
+    for(const GoodType good : helpers::enumRange<GoodType>())
+        goodTypes.emplace_back(GOOD_NAMES_1.at(good), good);
+    std::sort(goodTypes.begin(), goodTypes.end(), [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
+    return goodTypes;
 }
 
 void SetTextIfChanged(ctrlMultiline& text, const std::string& content)
@@ -158,14 +177,12 @@ iwAIDebug::iwAIDebug(GameWorldView& gwv, const std::vector<const AIPlayer*>& ais
     overlays->AddString("Borderland");
     overlays->AddString("Position rating");
     overlays->AddString("Buildings wanted");
+    overlays->AddString("Inventory");
 
     buildingType = AddComboBox(ID_CbBuildingType, DrawPoint(15, 90), Extent(250, 20), TextureColor::Grey, NormalFont,
                                100);
-    for(const BuildingType type : helpers::enumRange<BuildingType>())
-    {
-        if(BUILDING_SIZE[type] != BuildingQuality::Nothing)
-            buildingType->AddString(BUILDING_NAMES[type]);
-    }
+    for(const auto& type : GetSortedBuildingTypes())
+        buildingType->AddString(type.first);
     buildingType->SetSelection(0);
     buildingType->SetVisible(false);
 
@@ -228,6 +245,24 @@ void iwAIDebug::Msg_PaintBefore()
 
         for(const auto& wantedBuilding : wantedBuildings)
             ss << wantedBuilding.first << ": " << wantedBuilding.second << std::endl;
+
+        SetTextIfChanged(*text, ss.str());
+        return;
+    }
+
+    if(printer->overlay == OVERLAY_INVENTORY)
+    {
+        const auto* aiPlayer = dynamic_cast<const AIPlayer*>(printer->ai);
+        if(!aiPlayer)
+        {
+            SetTextIfChanged(*text, _("No inventory available"));
+            return;
+        }
+
+        ss << "Inventory:" << std::endl << std::endl;
+        const Inventory& inventory = aiPlayer->player.GetInventory();
+        for(const auto& good : GetSortedGoodTypes())
+            ss << good.first << ": " << inventory.goods[good.second] << std::endl;
 
         SetTextIfChanged(*text, ss.str());
         return;
