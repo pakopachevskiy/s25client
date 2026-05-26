@@ -35,6 +35,7 @@ RUN apt-get update \
 WORKDIR /src
 COPY . .
 
+ARG BUILD_PARALLELISM=2
 RUN cmake -S /src -B /src/build \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/opt/rttr \
@@ -42,7 +43,7 @@ RUN cmake -S /src -B /src/build \
         -DBUILD_TESTING=OFF \
         -DRTTR_BUILD_UPDATER=OFF \
         -DRTTR_USE_SYSTEM_LIBS=ON \
-    && cmake --build /src/build --target quantity-extractor --parallel
+    && cmake --build /src/build --target quantity-extractor --parallel "$BUILD_PARALLELISM"
 
 FROM ubuntu:24.04 AS runtime
 

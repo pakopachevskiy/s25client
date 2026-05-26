@@ -10,6 +10,7 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
 IMAGE_NAME=${IMAGE_NAME:-rttr-quantity-extractor:latest}
 RTTR_REVISION=${RTTR_REVISION:-$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || printf '0000000000000000000000000000000000000000')}
+BUILD_PARALLELISM=${BUILD_PARALLELISM:-2}
 CONTEXT_DIR=${TMPDIR:-/tmp}/rttr-quantity-extractor-context.$$
 
 cleanup() {
@@ -31,6 +32,7 @@ tar -C "$REPO_ROOT" \
 
 docker build \
     --build-arg "RTTR_REVISION=$RTTR_REVISION" \
+    --build-arg "BUILD_PARALLELISM=$BUILD_PARALLELISM" \
     --file "$CONTEXT_DIR/extras/quantity-extractor/Dockerfile" \
     --tag "$IMAGE_NAME" \
     "$CONTEXT_DIR"
