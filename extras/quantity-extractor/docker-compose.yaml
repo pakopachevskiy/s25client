@@ -1,0 +1,28 @@
+# Copyright (C) 2005 - 2026 Settlers Freaks <sf-team at siedler25.org>
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+# Build:
+#   docker compose build quantity-extractor
+#
+# Run:
+#   SAVE_DIR=/path/to/saves OUTPUT_DIR=/path/to/output \
+#     docker compose run --rm quantity-extractor /input/savegame.sav /output
+services:
+  quantity-extractor:
+    image: ${IMAGE_NAME:-rttr-quantity-extractor:latest}
+    build:
+      context: ../..
+      dockerfile: extras/quantity-extractor/Dockerfile
+      args:
+        RTTR_REVISION: ${RTTR_REVISION:-0000000000000000000000000000000000000000}
+    user: ${UID:-1000}:${GID:-1000}
+    volumes:
+      - type: bind
+        source: ${SAVE_DIR:-../../tmp}
+        target: /input
+        read_only: true
+      - type: bind
+        source: ${OUTPUT_DIR:-../../tmp/quantity-extractor-output}
+        target: /output
+    working_dir: /work
