@@ -15,6 +15,8 @@
 #include "gameData/BuildingProperties.h"
 #include "gameData/BuildingConsts.h"
 #include "ai/aijh/config/WeightParams.h"
+#include "GlobalGameSettings.h"
+#include "addons/const_addons.h"
 
 namespace AIJH {
 namespace {
@@ -114,6 +116,20 @@ int ComputeResourceRating(const AIWorldView& aijh, const AIQueryService& queries
     rating += ComputeRatingBonus(aijh, construction, type, pt);
     return rating;
 }
+
+bool UseMinimalResourceOnlyForInexhaustibleMine(const AIWorldView& aijh, const BuildingType type)
+{
+    if(!aijh.GetGameSettings().isEnabled(AddonId::INEXHAUSTIBLE_MINES))
+        return false;
+
+    switch(type)
+    {
+        case BuildingType::GoldMine:
+        case BuildingType::IronMine:
+        case BuildingType::CoalMine: return true;
+        default: return false;
+    }
+}
 } // namespace
 
 GlobalPositionFinder::GlobalPositionFinder(AIPlanningContext& aijh) : aijh(aijh) {}
@@ -200,6 +216,9 @@ std::optional<int> GlobalPositionFinder::GetPointRating(const BuildingType type,
             break;
         default: break;
     }
+
+    if(UseMinimalResourceOnlyForInexhaustibleMine(aijh, type))
+        return 1;
 
     const int baseRating = ComputeResourceRating(aijh, queries, construction, type, pt);
     const int resourcePenalty = ComputeResourcePenalty(aijh, queries, type, pt);
