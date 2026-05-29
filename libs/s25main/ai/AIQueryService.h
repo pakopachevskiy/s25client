@@ -135,7 +135,7 @@ private:
     const GamePlayer& player_;
     const unsigned char playerID_;
     bool reserveMilitaryBorderSlots_ = true;
-    unsigned reserveMilitaryBorderlandThreshold_ = 150;
+    unsigned reserveMilitaryBorderlandThreshold_ = 110;
     std::vector<unsigned> usableHarbors_;
 
     mutable std::unordered_map<CacheKey, CachedResourceValue, CacheKeyHash> resourceValueCache_;

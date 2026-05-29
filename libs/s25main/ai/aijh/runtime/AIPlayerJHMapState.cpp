@@ -69,6 +69,13 @@ int AIPlayerJH::GetResMapValue(const MapPoint pt, AIResource res) const
     return mapState_->GetResMapValue(pt, res);
 }
 
+int AIPlayerJH::GetResourceValueForDebug(const MapPoint pt, const AIResource res) const
+{
+    if(res == AIResource::Borderland)
+        return aii.Queries().CalcResourceValue(pt, res);
+    return GetResMapValue(pt, res);
+}
+
 AIResourceMap& AIPlayerJH::GetResMap(AIResource res)
 {
     return mapState_->GetResMap(res);

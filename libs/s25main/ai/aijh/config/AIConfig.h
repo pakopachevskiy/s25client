@@ -71,7 +71,7 @@ struct AIConfig
     BQPenaltyConfig bqPenalty;
     TroopsDistributionConfig troopsDistribution;
     bool reserveMilitaryBorderSlots = true;
-    unsigned reserveMilitaryBorderlandThreshold = 150;
+    unsigned reserveMilitaryBorderlandThreshold = 110;
     unsigned maxBuildingSites = 40;
     BuildParams builderAdvance = {3};
     std::vector<BuildingType> disableBuilding;

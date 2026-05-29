@@ -124,8 +124,12 @@ public:
         else if(overlay == 3)
             ticks[ai->GetAINode(pt).farmed]->DrawFull(curPos);
         else if(overlay < 13)
-            font.Draw(curPos, helpers::toString(ai->GetResMapValue(pt, AIResource(overlay - 4))), FontStyle{},
-                      COLOR_YELLOW);
+        {
+            const AIResource resource = AIResource(overlay - 4);
+            if(resource != AIResource::Borderland || ai->GetAINode(pt).owned)
+                font.Draw(curPos, helpers::toString(ai->GetResourceValueForDebug(pt, resource)), FontStyle{},
+                          COLOR_YELLOW);
+        }
         else if(overlay == OVERLAY_POSITION_RATING && ai->GetAINode(pt).owned)
         {
             const std::optional<int> rating = ai->GetPointRating(buildingType, pt);

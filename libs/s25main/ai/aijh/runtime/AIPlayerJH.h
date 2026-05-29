@@ -102,6 +102,7 @@ public:
     bool IsInvalidShipyardPosition(MapPoint pt);
 
     int GetResMapValue(MapPoint pt, AIResource res) const;
+    int GetResourceValueForDebug(MapPoint pt, AIResource res) const override;
     AIResourceMap& GetResMap(AIResource res);
     const AIResourceMap& GetResMap(AIResource res) const;
 
