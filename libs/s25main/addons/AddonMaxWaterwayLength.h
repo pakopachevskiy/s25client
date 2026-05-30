@@ -5,11 +5,20 @@
 #pragma once
 
 #include "AddonList.h"
+#include "GlobalGameSettings.h"
+#include "RTTR_Assert.h"
 #include "mygettext/mygettext.h"
 #include "s25util/warningSuppression.h"
 #include <array>
 
 const std::array<unsigned, 6> SUPPRESS_UNUSED waterwayLengths = {{3, 5, 9, 13, 21, 0}};
+
+inline unsigned GetMaxWaterwayLength(const GlobalGameSettings& ggs)
+{
+    const unsigned index = ggs.getSelection(AddonId::MAX_WATERWAY_LENGTH);
+    RTTR_Assert(index < waterwayLengths.size());
+    return waterwayLengths[index];
+}
 
 /**
  *  Addon for changing the maximum length of waterways.

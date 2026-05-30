@@ -68,7 +68,7 @@ public:
     bool FindFreePathForNewRoad(MapPoint start, MapPoint target, std::vector<Direction>* route = nullptr,
                                 unsigned* length = nullptr) const;
     bool FindFreePathForNewWaterRoad(MapPoint start, MapPoint target, std::vector<Direction>* route = nullptr,
-                                     unsigned* length = nullptr) const;
+                                     unsigned* length = nullptr, unsigned maxLength = 100) const;
     bool FindWeightedFreePathForNewRoad(MapPoint start, MapPoint target, const BQPenaltyConfig& bqPenalty,
                                         std::vector<Direction>* route = nullptr, unsigned* length = nullptr,
                                         bool allowFallback = true) const;

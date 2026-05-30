@@ -7,6 +7,7 @@
 #include "ai/aijh/runtime/AIPlayerJH.h"
 #include "RttrForeachPt.h"
 #include "GlobalGameSettings.h"
+#include "addons/AddonMaxWaterwayLength.h"
 #include "addons/const_addons.h"
 #include "boost/filesystem/fstream.hpp"
 #include "gameData/TerrainDesc.h"
@@ -15,6 +16,7 @@
 #include "nodeObjs/noFlag.h"
 #include "pathfinding/PathConditionRoad.h"
 
+#include <limits>
 #include <queue>
 #include <utility>
 
@@ -52,6 +54,12 @@ static auto createResourceMaps(const AIQueryService& queries, const GameWorldBas
     return createResourceMaps(queries, world, aiMap,
                               std::make_index_sequence<helpers::NumEnumValues_v<AIResource>>{});
 }
+
+struct ReachabilityState
+{
+    MapPoint pt;
+    unsigned waterLength;
+};
 
 } // namespace
 
@@ -91,70 +99,127 @@ AINodeResource AIMapState::CalcResource(MapPoint pt)
 
 void AIMapState::InitReachableNodes()
 {
-    std::queue<MapPoint> toCheck;
+    RebuildReachableNodes(true);
+}
+
+void AIMapState::RebuildReachableNodes(const bool resetFailedPenalty)
+{
+    std::queue<ReachabilityState> toCheck;
+    std::vector<bool> landVisited(aiMap_.Size(), false);
+    std::vector<unsigned> shortestWaterDistance(aiMap_.Size(), std::numeric_limits<unsigned>::max());
+    PathConditionRoad<GameWorldBase> landPathChecker(owner_.gwb, false);
+    PathConditionRoad<GameWorldBase> waterPathChecker(owner_.gwb, true);
+    const unsigned maxWaterwayLength = GetMaxWaterwayLength(owner_.gwb.GetGGS());
+
+    const auto hasWaterNeighbour = [this](const MapPoint pt) {
+        for(const MapPoint neighbour : aiMap_.GetNeighbours(pt))
+        {
+            if(owner_.gwb.IsWaterPoint(neighbour))
+                return true;
+        }
+        return false;
+    };
+    const auto isValidWaterwayEndpoint = [this, &hasWaterNeighbour](const MapPoint pt) {
+        if(!owner_.aii.IsOwnTerritory(pt) || owner_.gwb.IsWaterPoint(pt) || !hasWaterNeighbour(pt))
+            return false;
+
+        const auto* flag = owner_.gwb.GetSpecObj<noFlag>(pt);
+        if(flag)
+            return flag->GetPlayer() == owner_.playerId;
+
+        return owner_.gwb.GetBQ(pt, owner_.playerId) != BuildingQuality::Nothing && !owner_.gwb.IsFlagAround(pt);
+    };
+    const auto tryCommitLandNode = [this, &landVisited, &toCheck](const MapPoint pt) {
+        const unsigned idx = aiMap_.GetIdx(pt);
+        if(landVisited[idx])
+            return;
+
+        landVisited[idx] = true;
+        Node& node = aiMap_[idx];
+        if(node.failed_penalty > 0)
+        {
+            --node.failed_penalty;
+            return;
+        }
+
+        node.reachable = true;
+        toCheck.push({pt, 0});
+    };
+    const auto canUseWaterLength = [maxWaterwayLength](const unsigned length) {
+        return maxWaterwayLength == 0 || length <= maxWaterwayLength;
+    };
 
     RTTR_FOREACH_PT(MapPoint, aiMap_.GetSize())
     {
         Node& node = aiMap_[pt];
         node.reachable = false;
-        node.failed_penalty = 0;
+        if(resetFailedPenalty)
+            node.failed_penalty = 0;
         const auto* myFlag = owner_.gwb.GetSpecObj<noFlag>(pt);
         if(myFlag && myFlag->GetPlayer() == owner_.playerId)
         {
             node.reachable = true;
-            toCheck.push(pt);
+            landVisited[aiMap_.GetIdx(pt)] = true;
+            toCheck.push({pt, 0});
         }
     }
 
-    IterativeReachableNodeChecker(std::move(toCheck));
-}
-
-void AIMapState::IterativeReachableNodeChecker(std::queue<MapPoint> toCheck)
-{
-    PathConditionRoad<GameWorldBase> roadPathChecker(owner_.gwb, false);
     while(!toCheck.empty())
     {
-        const MapPoint curPt = toCheck.front();
+        const ReachabilityState state = toCheck.front();
+        toCheck.pop();
 
-        for(const MapPoint curNeighbour : aiMap_.GetNeighbours(curPt))
+        if(state.waterLength == 0)
         {
-            Node& node = aiMap_[curNeighbour];
-            if(node.reachable)
+            for(const MapPoint neighbour : aiMap_.GetNeighbours(state.pt))
+            {
+                if(landPathChecker.IsNodeOk(neighbour))
+                    tryCommitLandNode(neighbour);
+            }
+
+            if(!isValidWaterwayEndpoint(state.pt) || !canUseWaterLength(1))
                 continue;
 
-            if(roadPathChecker.IsNodeOk(curNeighbour))
+            for(const MapPoint neighbour : aiMap_.GetNeighbours(state.pt))
             {
-                if(node.failed_penalty == 0)
+                if(!waterPathChecker.IsNodeOk(neighbour))
+                    continue;
+
+                const unsigned idx = aiMap_.GetIdx(neighbour);
+                if(shortestWaterDistance[idx] > 1)
                 {
-                    node.reachable = true;
-                    toCheck.push(curNeighbour);
-                } else
-                {
-                    node.failed_penalty--;
+                    shortestWaterDistance[idx] = 1;
+                    toCheck.push({neighbour, 1});
                 }
             }
+            continue;
         }
-        toCheck.pop();
+
+        for(const MapPoint neighbour : aiMap_.GetNeighbours(state.pt))
+        {
+            const unsigned nextLength = state.waterLength + 1;
+            if(!canUseWaterLength(nextLength))
+                continue;
+
+            if(isValidWaterwayEndpoint(neighbour))
+                tryCommitLandNode(neighbour);
+
+            if(!waterPathChecker.IsNodeOk(neighbour))
+                continue;
+
+            const unsigned idx = aiMap_.GetIdx(neighbour);
+            if(shortestWaterDistance[idx] > nextLength)
+            {
+                shortestWaterDistance[idx] = nextLength;
+                toCheck.push({neighbour, nextLength});
+            }
+        }
     }
 }
 
-void AIMapState::UpdateReachableNodes(const std::vector<MapPoint>& pts)
+void AIMapState::UpdateReachableNodes(const std::vector<MapPoint>& /*pts*/)
 {
-    std::queue<MapPoint> toCheck;
-
-    for(const MapPoint& curPt : pts)
-    {
-        const auto* flag = owner_.gwb.GetSpecObj<noFlag>(curPt);
-        if(flag && flag->GetPlayer() == owner_.playerId)
-        {
-            aiMap_[curPt].reachable = true;
-            toCheck.push(curPt);
-        } else
-        {
-            aiMap_[curPt].reachable = false;
-        }
-    }
-    IterativeReachableNodeChecker(std::move(toCheck));
+    RebuildReachableNodes(false);
 }
 
 void AIMapState::InitNodes()

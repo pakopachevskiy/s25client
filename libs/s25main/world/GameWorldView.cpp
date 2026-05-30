@@ -242,9 +242,7 @@ void GameWorldView::DrawGUI(const RoadBuildState& rb, const TerrainRenderer& ter
         for(const auto dir : helpers::EnumRange<Direction>{})
             road_points[dir] = GetWorld().GetNeighbour(rb.point, dir);
 
-        const unsigned index = GetWorld().GetGGS().getSelection(AddonId::MAX_WATERWAY_LENGTH);
-        RTTR_Assert(index < waterwayLengths.size());
-        maxWaterWayLen = waterwayLengths[index];
+        maxWaterWayLen = GetMaxWaterwayLength(GetWorld().GetGGS());
     }
 
     for(int x = firstPt.x; x <= lastPt.x; ++x)

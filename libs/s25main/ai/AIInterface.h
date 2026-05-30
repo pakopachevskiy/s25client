@@ -49,9 +49,9 @@ public:
         return queryService_.FindFreePathForNewRoad(start, target, route, length);
     }
     bool FindFreePathForNewWaterRoad(MapPoint start, MapPoint target, std::vector<Direction>* route = nullptr,
-                                     unsigned* length = nullptr) const
+                                     unsigned* length = nullptr, unsigned maxLength = 100) const
     {
-        return queryService_.FindFreePathForNewWaterRoad(start, target, route, length);
+        return queryService_.FindFreePathForNewWaterRoad(start, target, route, length, maxLength);
     }
     bool FindWeightedFreePathForNewRoad(MapPoint start, MapPoint target, const BQPenaltyConfig& bqPenalty,
                                         std::vector<Direction>* route = nullptr, unsigned* length = nullptr,

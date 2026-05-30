@@ -145,6 +145,8 @@ platform support, and optional sanitizers for development builds.
   building memories are drawn.
 - [BuildQuality AI debug overlay rendering](development/buildquality-ai-debug-overlay-rendering.md)
   – How the AI Debug window draws cached build-quality icons over map nodes.
+- [Borderland AI debug overlay rendering](development/borderland-ai-debug-overlay-rendering.md)
+  – How the AI Debug window calculates and draws live cached Borderland values.
 - [Tree and granite rendering](development/tree-and-granite-rendering.md) –
   How functional environment-object sprites, animation state, fog memories,
   and minimap markers are drawn.

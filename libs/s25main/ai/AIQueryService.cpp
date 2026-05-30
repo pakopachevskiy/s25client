@@ -642,9 +642,9 @@ bool AIQueryService::FindFreePathForNewRoad(MapPoint start, MapPoint target, std
 }
 
 bool AIQueryService::FindFreePathForNewWaterRoad(MapPoint start, MapPoint target, std::vector<Direction>* route,
-                                                 unsigned* length) const
+                                                 unsigned* length, const unsigned maxLength) const
 {
-    return gwb.GetFreePathFinder().FindPath(start, target, false, 100, route, length, nullptr,
+    return gwb.GetFreePathFinder().FindPath(start, target, false, maxLength, route, length, nullptr,
                                             makePathConditionRoad(gwb, true));
 }
 

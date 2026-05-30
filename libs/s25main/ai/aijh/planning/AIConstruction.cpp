@@ -9,6 +9,7 @@
 #include "GlobalGameSettings.h"
 #include "Jobs.h"
 #include "Point.h"
+#include "addons/AddonMaxWaterwayLength.h"
 #include "addons/const_addons.h"
 #include "ai/AIInterface.h"
 #include "ai/aijh/config/AIConfig.h"
@@ -327,6 +328,36 @@ namespace {
         double score = std::numeric_limits<double>::infinity();
         std::vector<Direction> route;
     };
+
+    bool IsValidWaterwayEndpoint(const AIInterface& aii, const MapPoint pt)
+    {
+        if(!aii.IsOwnTerritory(pt) || aii.gwb.IsWaterPoint(pt))
+            return false;
+
+        bool hasWaterNeighbour = false;
+        for(const MapPoint neighbour : aii.gwb.GetNeighbours(pt))
+        {
+            if(aii.gwb.IsWaterPoint(neighbour))
+            {
+                hasWaterNeighbour = true;
+                break;
+            }
+        }
+        if(!hasWaterNeighbour)
+            return false;
+
+        const auto* flag = aii.gwb.GetSpecObj<noFlag>(pt);
+        if(flag)
+            return flag->GetPlayer() == aii.GetPlayerId();
+
+        return aii.GetBuildingQuality(pt) != BuildingQuality::Nothing && !aii.gwb.IsFlagAround(pt);
+    }
+
+    unsigned GetWaterwaySearchLength(const GameWorldBase& world)
+    {
+        const unsigned maxLength = GetMaxWaterwayLength(world.GetGGS());
+        return maxLength == 0 ? world.GetSize().x * world.GetSize().y : maxLength;
+    }
 } // namespace
 
 std::vector<const noFlag*> AIConstruction::FindFlags(const MapPoint pt, unsigned short radius)
@@ -517,7 +548,7 @@ bool AIConstruction::ConnectFlagToRoadSytem(const noFlag* flag, std::vector<Dire
         constructionlocations.push_back(bestCandidate.flag->GetPos());
         return true;
     }
-    return false;
+    return ConnectFlagToRoadSystemViaWaterway(flag, route, maxSearchRadius);
 }
 
 bool AIConstruction::MinorRoadImprovements(const noRoadNode* start, const noRoadNode* target,
@@ -591,12 +622,70 @@ bool AIConstruction::BuildRoad(const noRoadNode* start, const noRoadNode* target
 
 bool AIConstruction::BuildWaterRoad(const noRoadNode* start, const noRoadNode* target, std::vector<Direction>& route)
 {
-    if(route.empty() && !aii.FindFreePathForNewWaterRoad(start->GetPos(), target->GetPos(), &route))
+    return BuildWaterRoad(start->GetPos(), target->GetPos(), route);
+}
+
+bool AIConstruction::BuildWaterRoad(const MapPoint start, const MapPoint target, std::vector<Direction>& route)
+{
+    const unsigned maxLength = GetMaxWaterwayLength(aii.gwb.GetGGS());
+    if(route.empty()
+       && !aii.FindFreePathForNewWaterRoad(start, target, &route, nullptr, GetWaterwaySearchLength(aii.gwb)))
+        return false;
+    if(route.size() < 2 || (maxLength > 0 && route.size() > maxLength))
         return false;
 
-    aii.BuildRoad(start->GetPos(), true, route);
+    aii.BuildRoad(start, true, route);
     waterRoadPlanned_ = true;
     return true;
+}
+
+bool AIConstruction::ConnectFlagToRoadSystemViaWaterway(const noFlag* flag, std::vector<Direction>& route,
+                                                        const unsigned maxSearchRadius)
+{
+    const MapPoint flagPos = flag->GetPos();
+    const unsigned waterSearchLength = GetWaterwaySearchLength(aii.gwb);
+    const unsigned short connectedFlagSearchRadius =
+      static_cast<unsigned short>(std::min<unsigned>(waterSearchLength, aii.gwb.CalcMaxDistance()));
+
+    for(const MapPoint endpoint : aii.gwb.GetPointsInRadiusWithCenter(flagPos, maxSearchRadius))
+    {
+        if(!IsValidWaterwayEndpoint(aii, endpoint))
+            continue;
+
+        std::vector<Direction> landRoute;
+        if(endpoint != flagPos)
+        {
+            if(!aii.FindFreePathForNewRoad(flagPos, endpoint, &landRoute) || landRoute.size() < 2)
+                continue;
+            if(GetMaxNonFlaggableRun(aii, aijh, flagPos, landRoute) > 2)
+                continue;
+        }
+
+        for(const noFlag* connectedFlag : FindFlags(endpoint, connectedFlagSearchRadius))
+        {
+            if(connectedFlag->GetPos() == endpoint || !IsConnectedToRoadSystem(connectedFlag))
+                continue;
+
+            std::vector<Direction> waterRoute;
+            if(!aii.FindFreePathForNewWaterRoad(connectedFlag->GetPos(), endpoint, &waterRoute, nullptr,
+                                                waterSearchLength)
+               || !BuildWaterRoad(connectedFlag->GetPos(), endpoint, waterRoute))
+            {
+                continue;
+            }
+
+            if(!landRoute.empty())
+                aii.BuildRoad(flagPos, false, landRoute);
+
+            route = std::move(landRoute);
+            constructionlocations.push_back(flagPos);
+            constructionlocations.push_back(endpoint);
+            constructionlocations.push_back(connectedFlag->GetPos());
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool AIConstruction::IsConnectedToRoadSystem(const noFlag* flag) const

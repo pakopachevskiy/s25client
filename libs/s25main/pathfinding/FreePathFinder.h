@@ -28,7 +28,7 @@ public:
     FreePathFinder(GameWorldBase& gwb) : gwb_(gwb), currentVisit(0), size_(0, 0) {}
     void Init(const MapExtent& mapSize);
 
-    /// Wegfindung in freiem Terrain - Template version. Users need to include FreePathFinderImpl.h
+    /// Pathfinding in open terrain - Template version. Users need to include FreePathFinderImpl.h
     /// TNodeChecker must implement: bool IsNodeOk(MapPoint pt, unsigned char dirFromPrevPt) and bool
     /// IsNodeToDestOk(MapPoint pt, unsigned char dirFromPrevPt)
     template<class TNodeChecker>
@@ -46,7 +46,7 @@ public:
                                                FP_Node_OK_Callback IsNodeToDestOk,
                                                FP_Node_Cost_Callback GetNodeCost, const void* param);
 
-    /// Ermittelt, ob eine freie Route noch passierbar ist und gibt den Endpunkt der Route zurück
+    /// Determines whether a free route is still passable and returns the endpoint of the route
     template<class TNodeChecker>
     bool CheckRoute(MapPoint start, const std::vector<Direction>& route, unsigned pos, const TNodeChecker& nodeChecker,
                     MapPoint* dest) const;

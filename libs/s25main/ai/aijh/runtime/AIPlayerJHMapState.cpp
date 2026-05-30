@@ -18,11 +18,6 @@ void AIPlayerJH::InitReachableNodes()
     mapState_->InitReachableNodes();
 }
 
-void AIPlayerJH::IterativeReachableNodeChecker(std::queue<MapPoint> toCheck)
-{
-    mapState_->IterativeReachableNodeChecker(std::move(toCheck));
-}
-
 void AIPlayerJH::UpdateReachableNodes(const std::vector<MapPoint>& pts)
 {
     mapState_->UpdateReachableNodes(pts);

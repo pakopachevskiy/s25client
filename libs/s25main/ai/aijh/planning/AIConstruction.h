@@ -105,6 +105,9 @@ public:
 
 private:
     bool BuildWaterRoad(const noRoadNode* start, const noRoadNode* target, std::vector<Direction>& route);
+    bool BuildWaterRoad(MapPoint start, MapPoint target, std::vector<Direction>& route);
+    bool ConnectFlagToRoadSystemViaWaterway(const noFlag* flag, std::vector<Direction>& route,
+                                            unsigned maxSearchRadius);
 
     AIPlanningContext& aijh;
     AIInterface& aii;

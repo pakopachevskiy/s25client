@@ -35,6 +35,7 @@ namespace {
 // We need border land
 using BiggerWorldWithGCExecution = WorldWithGCExecution<1, 24, 22>;
 using WaterwayWorldWithGCExecution = WorldWithGCExecution<1, 24, 22>;
+using LongWaterwayWorldWithGCExecution = WorldWithGCExecution<1, 64, 22>;
 using EmptyWorldFixture1P = WorldFixture<CreateEmptyWorld, 1>;
 using EmptyWorldFixture2P = WorldFixture<CreateEmptyWorld, 2>;
 
@@ -88,6 +89,46 @@ void SetWaterwayTerrain(GameWorld& world, MapPoint pt, const std::vector<Directi
         for(const Direction dir : helpers::EnumRange<Direction>{})
             setRightTerrain(world, pt, dir, water);
     }
+}
+
+void SetTerrainAround(GameWorld& world, MapPoint pt, DescIdx<TerrainDesc> terrain)
+{
+    for(const Direction dir : helpers::EnumRange<Direction>{})
+        setRightTerrain(world, pt, dir, terrain);
+}
+
+struct ReachabilityWaterway
+{
+    MapPoint source;
+    MapPoint endpoint;
+    MapPoint beyondShore;
+    std::vector<Direction> route;
+};
+
+ReachabilityWaterway CreateReachabilityWaterway(GameWorld& world, unsigned playerId, unsigned length)
+{
+    SetAllOwned(world);
+    world.RecalcBorderStones(Position(0, 0), Extent(world.GetSize()));
+    const auto water = GetWaterTerrain(world.GetDescription());
+    const auto land = GetLandTerrain(world.GetDescription(), ETerrain::Buildable);
+    RTTR_FOREACH_PT(MapPoint, world.GetSize())
+    {
+        world.GetNodeWriteable(pt).t1 = water;
+        world.GetNodeWriteable(pt).t2 = water;
+    }
+
+    ReachabilityWaterway waterway;
+    waterway.source = world.GetNeighbour(world.GetPlayer(playerId).GetHQPos(), Direction::SouthEast);
+    waterway.route.assign(length, Direction::East);
+    waterway.endpoint = GetRouteEnd(world, waterway.source, waterway.route);
+    waterway.beyondShore = world.GetNeighbour(waterway.endpoint, Direction::East);
+
+    setRightTerrain(world, waterway.source, Direction::West, land);
+    setRightTerrain(world, waterway.endpoint, Direction::East, land);
+    SetTerrainAround(world, waterway.beyondShore, land);
+    SetTerrainAround(world, world.GetNeighbour(waterway.beyondShore, Direction::East), land);
+    world.InitAfterLoad();
+    return waterway;
 }
 
 struct WaterwayShortcut
@@ -163,6 +204,98 @@ BOOST_FIXTURE_TEST_CASE(AIChat, EmptyWorldFixture2P)
         BOOST_TEST(msg->destination == dest);
         BOOST_TEST(msg->text == "Hello again!");
     }
+}
+
+BOOST_FIXTURE_TEST_CASE(Reachability_CrossesShortWaterwayAndResumesLandFloodFill, WaterwayWorldWithGCExecution)
+{
+    const ReachabilityWaterway waterway = CreateReachabilityWaterway(world, curPlayer, 2);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+
+    BOOST_TEST(ai.GetAINode(waterway.endpoint).reachable);
+    BOOST_TEST(ai.GetAINode(waterway.beyondShore).reachable);
+
+    MapPoint pt = waterway.source;
+    for(std::size_t i = 0; i + 1 < waterway.route.size(); ++i)
+    {
+        pt = world.GetNeighbour(pt, waterway.route[i]);
+        BOOST_TEST(!ai.GetAINode(pt).reachable);
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(Reachability_AcceptsWaterwayAtConfiguredMaximum, WaterwayWorldWithGCExecution)
+{
+    ggs.setSelection(AddonId::MAX_WATERWAY_LENGTH, 0);
+    const ReachabilityWaterway waterway = CreateReachabilityWaterway(world, curPlayer, 3);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+
+    BOOST_TEST(ai.GetAINode(waterway.endpoint).reachable);
+    BOOST_TEST(ai.GetAINode(waterway.beyondShore).reachable);
+}
+
+BOOST_FIXTURE_TEST_CASE(Reachability_RejectsWaterwayLongerThanConfiguredMaximum, WaterwayWorldWithGCExecution)
+{
+    ggs.setSelection(AddonId::MAX_WATERWAY_LENGTH, 0);
+    const ReachabilityWaterway waterway = CreateReachabilityWaterway(world, curPlayer, 4);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+
+    BOOST_TEST(!ai.GetAINode(waterway.endpoint).reachable);
+    BOOST_TEST(!ai.GetAINode(waterway.beyondShore).reachable);
+}
+
+BOOST_FIXTURE_TEST_CASE(Reachability_UnlimitedWaterwayTerminatesAndExceedsLargestFiniteSetting,
+                        LongWaterwayWorldWithGCExecution)
+{
+    ggs.setSelection(AddonId::MAX_WATERWAY_LENGTH, 5);
+    const ReachabilityWaterway waterway = CreateReachabilityWaterway(world, curPlayer, 22);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+
+    BOOST_TEST(ai.GetAINode(waterway.endpoint).reachable);
+    BOOST_TEST(ai.GetAINode(waterway.beyondShore).reachable);
+}
+
+BOOST_FIXTURE_TEST_CASE(Reachability_DoesNotResetLengthOrExposeWaterInteriors, WaterwayWorldWithGCExecution)
+{
+    ggs.setSelection(AddonId::MAX_WATERWAY_LENGTH, 1);
+    const ReachabilityWaterway waterway = CreateReachabilityWaterway(world, curPlayer, 6);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+
+    BOOST_TEST(!ai.GetAINode(waterway.endpoint).reachable);
+    MapPoint pt = waterway.source;
+    for(std::size_t i = 0; i + 1 < waterway.route.size(); ++i)
+    {
+        pt = world.GetNeighbour(pt, waterway.route[i]);
+        BOOST_TEST(!ai.GetAINode(pt).reachable);
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(Reachability_UpdateClearsFarShoreAfterEndpointRemoval, WaterwayWorldWithGCExecution)
+{
+    const ReachabilityWaterway waterway = CreateReachabilityWaterway(world, curPlayer, 2);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    BOOST_TEST_REQUIRE(ai.GetAINode(waterway.beyondShore).reachable);
+
+    world.SetOwner(waterway.endpoint, 0);
+    ai.UpdateNodesAround(waterway.endpoint, 1);
+
+    BOOST_TEST(!ai.GetAINode(waterway.endpoint).reachable);
+    BOOST_TEST(!ai.GetAINode(waterway.beyondShore).reachable);
+}
+
+BOOST_FIXTURE_TEST_CASE(Reachability_LandRetryPenaltySurvivesRecalculation, WaterwayWorldWithGCExecution)
+{
+    SetAllOwned(world);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    const MapPoint pt = world.GetNeighbour(world.GetNeighbour(hqPos, Direction::SouthEast), Direction::West);
+    BOOST_TEST_REQUIRE(ai.GetAINode(pt).reachable);
+
+    ai.GetAINode(pt).reachable = false;
+    ai.GetAINode(pt).failed_penalty = 1;
+    ai.UpdateNodesAround(pt, 1);
+    BOOST_TEST(!ai.GetAINode(pt).reachable);
+    BOOST_TEST(ai.GetAINode(pt).failed_penalty == 0);
+
+    ai.UpdateNodesAround(pt, 1);
+    BOOST_TEST(ai.GetAINode(pt).reachable);
 }
 
 BOOST_FIXTURE_TEST_CASE(KeepBQUpdated, BiggerWorldWithGCExecution)
@@ -381,6 +514,66 @@ BOOST_FIXTURE_TEST_CASE(BuildAlternativeWaterRoad_RequiresAvailableBoat, Waterwa
     std::vector<Direction> route;
     BOOST_TEST(!ai.GetConstruction().BuildAlternativeWaterRoad(world.GetSpecObj<noFlag>(shortcut.source), route));
     BOOST_TEST(ai.FetchGameCommands().empty());
+}
+
+BOOST_FIXTURE_TEST_CASE(ConnectFlagToRoadSystem_BuildsRequiredWaterway, WaterwayWorldWithGCExecution)
+{
+    const WaterwayShortcut shortcut = CreateWaterwayShortcut(world, curPlayer, false);
+    const noFlag* targetFlag = world.GetSpecObj<noFlag>(shortcut.target);
+    BOOST_TEST_REQUIRE(targetFlag);
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    BOOST_TEST(!ai.GetConstruction().IsConnectedToRoadSystem(targetFlag));
+
+    std::vector<Direction> route;
+    BOOST_TEST_REQUIRE(ai.GetConstruction().ConnectFlagToRoadSytem(targetFlag, route, 1));
+    BOOST_TEST(route.empty());
+    BOOST_TEST(ai.GetConstruction().HasPlannedWaterRoad());
+
+    auto commands = ai.FetchGameCommands();
+    BOOST_TEST_REQUIRE(commands.size() == 1u);
+    commands.front()->Execute(world, curPlayer);
+
+    BOOST_TEST_REQUIRE(targetFlag->GetRoute(Direction::West));
+    BOOST_TEST(static_cast<int>(targetFlag->GetRoute(Direction::West)->GetRoadType())
+               == static_cast<int>(RoadType::Water));
+    BOOST_TEST(!ai.GetConstruction().IsConnectedToRoadSystem(targetFlag));
+}
+
+BOOST_FIXTURE_TEST_CASE(ConnectFlagToRoadSystem_BuildsWaterwayBeforeFarShoreLandRoad, WaterwayWorldWithGCExecution)
+{
+    SetAllOwned(world);
+    const MapPoint source = world.GetNeighbour(world.GetPlayer(curPlayer).GetHQPos(), Direction::SouthEast);
+    const std::vector<Direction> waterRoute{Direction::East, Direction::East};
+    const MapPoint shoreline = GetRouteEnd(world, source, waterRoute);
+    const std::vector<Direction> landRoute{Direction::West, Direction::West};
+    const MapPoint farShoreFlagPos =
+      world.GetNeighbour(world.GetNeighbour(shoreline, Direction::East), Direction::East);
+    world.SetFlag(farShoreFlagPos, curPlayer);
+    SetWaterwayTerrain(world, source, waterRoute);
+
+    const noFlag* farShoreFlag = world.GetSpecObj<noFlag>(farShoreFlagPos);
+    BOOST_TEST_REQUIRE(farShoreFlag);
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    std::vector<Direction> route;
+    BOOST_TEST_REQUIRE(ai.GetConstruction().ConnectFlagToRoadSytem(farShoreFlag, route, 2));
+    BOOST_TEST(route == landRoute, boost::test_tools::per_element());
+
+    auto commands = ai.FetchGameCommands();
+    BOOST_TEST_REQUIRE(commands.size() == 2u);
+    for(auto& command : commands)
+        command->Execute(world, curPlayer);
+
+    const noFlag* shorelineFlag = world.GetSpecObj<noFlag>(shoreline);
+    BOOST_TEST_REQUIRE(shorelineFlag);
+    BOOST_TEST_REQUIRE(shorelineFlag->GetRoute(Direction::West));
+    BOOST_TEST(static_cast<int>(shorelineFlag->GetRoute(Direction::West)->GetRoadType())
+               == static_cast<int>(RoadType::Water));
+    BOOST_TEST_REQUIRE(farShoreFlag->GetRoute(Direction::West));
+    BOOST_TEST(static_cast<int>(farShoreFlag->GetRoute(Direction::West)->GetRoadType())
+               == static_cast<int>(RoadType::Normal));
+    BOOST_TEST(!ai.GetConstruction().IsConnectedToRoadSystem(farShoreFlag));
 }
 
 BOOST_FIXTURE_TEST_CASE(Waterways_DoNotProvideLandConnectivityOrInteriorFlagsAndSurviveCleanup, WaterwayWorldWithGCExecution)

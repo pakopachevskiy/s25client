@@ -1017,10 +1017,7 @@ bool dskGameInterface::BuildRoadPart(MapPoint& cSel)
     // Test on water way length
     if(road.mode == RoadBuildMode::Boat)
     {
-        unsigned char index = worldViewer.GetWorld().GetGGS().getSelection(AddonId::MAX_WATERWAY_LENGTH);
-
-        RTTR_Assert(index < waterwayLengths.size());
-        const unsigned max_length = waterwayLengths[index];
+        const unsigned max_length = GetMaxWaterwayLength(worldViewer.GetWorld().GetGGS());
 
         unsigned length = road.route.size() + new_route.size();
 

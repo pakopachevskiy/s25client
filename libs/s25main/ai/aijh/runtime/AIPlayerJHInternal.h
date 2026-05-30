@@ -57,7 +57,6 @@
     void TrySeaAttack();
     void SaveResourceMapsToFile();
     void InitReachableNodes();
-    void IterativeReachableNodeChecker(std::queue<MapPoint> toCheck);
     void UpdateReachableNodes(const std::vector<MapPoint>& pts);
     void MilUpgradeOptim();
     double GetCaptureRiskEstimate(const nobBaseMilitary& building) const;

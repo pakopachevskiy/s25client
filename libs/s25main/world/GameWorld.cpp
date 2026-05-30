@@ -220,9 +220,7 @@ void GameWorld::BuildRoad(const unsigned char playerId, const bool boat_road, co
 
     if(boat_road)
     {
-        const unsigned index = GetGGS().getSelection(AddonId::MAX_WATERWAY_LENGTH);
-        RTTR_Assert(index < waterwayLengths.size());
-        const unsigned maxLength = waterwayLengths[index];
+        const unsigned maxLength = GetMaxWaterwayLength(GetGGS());
         if(maxLength > 0 && route.size() > maxLength)
         {
             RoadEventLogger::LogRoadConstructionFailed(GetEvMgr().GetCurrentGF(), *this, playerId, start, route,

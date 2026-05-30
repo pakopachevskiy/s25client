@@ -7,7 +7,6 @@
 #include "ai/aijh/runtime/AIMap.h"
 #include "ai/aijh/runtime/AIResourceMap.h"
 
-#include <queue>
 #include <vector>
 
 class AIQueryService;
@@ -26,7 +25,6 @@ public:
     void InitNodes();
     void InitResourceMaps();
     void InitReachableNodes();
-    void IterativeReachableNodeChecker(std::queue<MapPoint> toCheck);
     void UpdateReachableNodes(const std::vector<MapPoint>& pts);
     void UpdateNodesAround(MapPoint pt, unsigned radius);
     void SetFarmedNodes(MapPoint pt, bool set);
@@ -44,6 +42,8 @@ public:
     std::vector<MapPoint>& GetNodesWithOutdatedBQ() { return nodesWithOutdatedBQ_; }
 
 private:
+    void RebuildReachableNodes(bool resetFailedPenalty);
+
     AIPlayerJH& owner_;
     AIMap aiMap_;
     helpers::EnumArray<AIResourceMap, AIResource> resourceMaps_;
