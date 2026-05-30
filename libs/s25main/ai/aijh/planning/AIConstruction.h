@@ -78,6 +78,8 @@ public:
     /// Tries to build a second road to a flag.
     bool BuildAlternativeRoad(const noFlag* flag, std::vector<Direction>& route,
                               AlternativeRoadPolicy policy = AlternativeRoadPolicy::ShortcutOnly);
+    /// Tries to build a waterway shortcut between two land-connected flags.
+    bool BuildAlternativeWaterRoad(const noFlag* flag, std::vector<Direction>& route);
 
     bool OtherStoreInRadius(MapPoint pt, unsigned radius);
 
@@ -97,10 +99,13 @@ public:
     void ConstructionOrdered(const BuildJob& job);
     /// To be called when the current pending construction orders were processed (usually on NWF)
     void ConstructionsExecuted();
+    bool HasPlannedWaterRoad() const { return waterRoadPlanned_; }
     bool IsGlobalSearchOnCooldown(BuildingType type) const;
     void StartGlobalSearchCooldown(BuildingType type, unsigned durationGF);
 
 private:
+    bool BuildWaterRoad(const noRoadNode* start, const noRoadNode* target, std::vector<Direction>& route);
+
     AIPlanningContext& aijh;
     AIInterface& aii;
     const BuildingPlanner& bldPlanner;
@@ -118,6 +123,7 @@ private:
     // contains the amount of buildings ordered since the last nwf
     helpers::EnumArray<uint8_t, BuildingType> constructionorders;
     helpers::EnumArray<unsigned, BuildingType> nextGlobalSearchAllowedGF_{};
+    bool waterRoadPlanned_ = false;
 };
 
 } // namespace AIJH

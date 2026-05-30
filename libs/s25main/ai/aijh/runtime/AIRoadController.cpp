@@ -26,7 +26,7 @@ void AIRoadController::HandleRoadConstructionComplete(MapPoint pt, Direction dir
         return;
 
     const RoadSegment* const roadSeg = flag->GetRoute(dir);
-    if(!roadSeg || roadSeg->GetLength() < 4)
+    if(!roadSeg || roadSeg->GetRoadType() == RoadType::Water || roadSeg->GetLength() < 4)
         return;
 
     const noFlag& otherFlag = roadSeg->GetOtherFlag(*flag);
@@ -72,7 +72,7 @@ bool AIRoadController::IsFlagPartOfCircle(const noFlag& startFlag, unsigned maxl
             continue;
         }
         const RoadSegment* route = curFlag.GetRoute(testDir);
-        if(route)
+        if(route && route->GetRoadType() != RoadType::Water)
         {
             const noFlag& flag = route->GetOtherFlag(curFlag);
             if(!helpers::contains(oldFlags, &flag))
@@ -146,7 +146,10 @@ bool AIRoadController::RemoveUnusedRoad(const noFlag& startFlag, helpers::Option
         {
             return true;
         }
-        if(startFlag.GetRoute(dir))
+        const RoadSegment* route = startFlag.GetRoute(dir);
+        if(route && route->GetRoadType() == RoadType::Water)
+            return false;
+        if(route)
         {
             ++finds;
             if(finds == 1)

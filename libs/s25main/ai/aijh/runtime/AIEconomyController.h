@@ -49,10 +49,15 @@ public:
     const helpers::EnumArray<unsigned, GoodType>& GetProducedGoods() const { return goodsProduced_; }
 
 private:
+    void ManageBoatReserve();
+    void ReleaseBoatReserveShipyard();
+
     AIPlayerJH& owner_;
     MapPoint upgradeBldPos_ = MapPoint::Invalid();
+    MapPoint boatReserveShipyardPos_ = MapPoint::Invalid();
     helpers::EnumArray<unsigned, GoodType> goodsProduced_{};
     uint8_t metalworksIronDistributionBase_ = 0;
+    bool boatReserveShipyardWasProductionDisabled_ = false;
     Distributions distributionAdjusterBase_{};
 };
 

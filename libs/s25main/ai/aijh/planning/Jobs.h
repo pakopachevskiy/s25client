@@ -28,6 +28,7 @@ enum class JobState
     ExecutingRoad1,
     ExecutingRoad2,
     ExecutingRoad2_2,
+    ExecutingWaterRoad,
     Finished,
     Failed
 };
@@ -87,6 +88,7 @@ private:
     void TryToBuild();
     void BuildMainRoad();
     void TryToBuildSecondaryRoad();
+    void TryToBuildAlternativeWaterRoad();
 };
 
 struct CompareByPriority {

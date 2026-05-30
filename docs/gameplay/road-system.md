@@ -79,6 +79,9 @@ connection.  Waterways belong to the transport graph too, but not every kind of
 path search is allowed to use them.  For example, land-only movement and many
 road-construction checks ignore water roads.
 
+The maximum waterway-length addon is enforced by the game world when the road
+command executes. This applies equally to UI, AI, network, and replay commands.
+
 ## Building Roads
 
 A player-built road starts at an owned flag and follows a route of neighbouring
@@ -150,6 +153,12 @@ prefer less busy paths without requiring a global traffic optimizer.
 Some path searches deliberately use a simpler model.  Human road-node walking
 and AI road-connection checks can ask for plain land-road distance, which counts
 segment length and excludes water roads and carrier congestion.
+
+The AI may add waterways as ware-logistics shortcuts between shoreline flags
+that are already connected by land roads. It does not use waterways to satisfy
+building or worker connectivity. Completed AI waterways are kept as single
+segments without automatically added interior flags, and the AI can assign a
+shipyard to replenish a small stored-boat reserve.
 
 ## Road Destruction and Capture
 

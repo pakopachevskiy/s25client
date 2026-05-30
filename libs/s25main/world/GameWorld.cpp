@@ -14,6 +14,7 @@
 #include "RoadEventLogger.h"
 #include "RttrForeachPt.h"
 #include "TradePathCache.h"
+#include "addons/AddonMaxWaterwayLength.h"
 #include "addons/const_addons.h"
 #include "buildings/noBuildingSite.h"
 #include "buildings/nobMilitary.h"
@@ -215,6 +216,21 @@ void GameWorld::BuildRoad(const unsigned char playerId, const bool boat_road, co
                                                    boat_road ? RoadType::Water : RoadType::Normal,
                                                    RoadEventLogger::RoadConstructionFailureReason::RouteTooShort);
         return;
+    }
+
+    if(boat_road)
+    {
+        const unsigned index = GetGGS().getSelection(AddonId::MAX_WATERWAY_LENGTH);
+        RTTR_Assert(index < waterwayLengths.size());
+        const unsigned maxLength = waterwayLengths[index];
+        if(maxLength > 0 && route.size() > maxLength)
+        {
+            RoadEventLogger::LogRoadConstructionFailed(GetEvMgr().GetCurrentGF(), *this, playerId, start, route,
+                                                       RoadType::Water,
+                                                       RoadEventLogger::RoadConstructionFailureReason::RouteTooLong);
+            GetNotifications().publish(RoadNote(RoadNote::ConstructionFailed, playerId, start, route));
+            return;
+        }
     }
 
     if(!GetSpecObj<noFlag>(start) || GetSpecObj<noFlag>(start)->GetPlayer() != playerId)

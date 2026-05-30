@@ -531,6 +531,11 @@ void GamePlayer::DeleteRoad(RoadSegment* rs)
     roads.remove(rs);
 }
 
+bool GamePlayer::HasWaterRoads() const
+{
+    return helpers::contains_if(roads, [](const RoadSegment* road) { return road->GetRoadType() == RoadType::Water; });
+}
+
 void GamePlayer::FindClientForLostWares()
 {
     // All lost wares must check whether they can find a warehouse

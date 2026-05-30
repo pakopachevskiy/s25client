@@ -48,6 +48,11 @@ public:
     {
         return queryService_.FindFreePathForNewRoad(start, target, route, length);
     }
+    bool FindFreePathForNewWaterRoad(MapPoint start, MapPoint target, std::vector<Direction>* route = nullptr,
+                                     unsigned* length = nullptr) const
+    {
+        return queryService_.FindFreePathForNewWaterRoad(start, target, route, length);
+    }
     bool FindWeightedFreePathForNewRoad(MapPoint start, MapPoint target, const BQPenaltyConfig& bqPenalty,
                                         std::vector<Direction>* route = nullptr, unsigned* length = nullptr,
                                         bool allowFallback = true) const
@@ -57,6 +62,10 @@ public:
     bool FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr) const
     {
         return queryService_.FindPathOnRoads(start, target, length);
+    }
+    bool FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr) const
+    {
+        return queryService_.FindPathForWareOnRoads(start, target, length);
     }
     bool CanBuildCatapult() const { return queryService_.CanBuildCatapult(); }
     bool CanBuildBuildingtype(BuildingType bt) const { return queryService_.CanBuildBuildingtype(bt); }

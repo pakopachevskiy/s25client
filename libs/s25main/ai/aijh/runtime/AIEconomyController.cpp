@@ -17,6 +17,7 @@
 #include "ai/aijh/runtime/AIEconomyController.h"
 #include "buildings/nobBaseWarehouse.h"
 #include "buildings/nobMilitary.h"
+#include "buildings/nobShipYard.h"
 #include "buildings/nobUsual.h"
 #include "gameData/BuildingConsts.h"
 #include "gameData/BuildingProperties.h"
@@ -542,6 +543,8 @@ unsigned AIEconomyController::AmountInStorage(const Job job) const
 
 void AIEconomyController::AdjustSettings()
 {
+    ManageBoatReserve();
+
     const Inventory& inventory = owner_.aii.GetInventory();
     if(owner_.bldPlanner->GetNumBuildings(BuildingType::Metalworks) > 0u)
     {
@@ -631,6 +634,64 @@ void AIEconomyController::AdjustSettings()
     {
         owner_.aii.ChangeMilitary(milSettings);
     }
+}
+
+void AIEconomyController::ManageBoatReserve()
+{
+    constexpr unsigned boatReserve = 2;
+    const bool needsBoatReserve =
+      owner_.GetPlayer().HasWaterRoads() || owner_.GetConstruction().HasPlannedWaterRoad();
+    if(!needsBoatReserve || AmountInStorage(GoodType::Boat) >= boatReserve)
+    {
+        ReleaseBoatReserveShipyard();
+        return;
+    }
+
+    const std::list<nobUsual*>& shipyards = owner_.aii.GetBuildings(BuildingType::Shipyard);
+    const nobShipYard* reserveShipyard = nullptr;
+    for(const nobUsual* shipyard : shipyards)
+    {
+        if(shipyard->GetPos() == boatReserveShipyardPos_)
+        {
+            reserveShipyard = static_cast<const nobShipYard*>(shipyard);
+            break;
+        }
+    }
+    if(!reserveShipyard && !shipyards.empty())
+    {
+        reserveShipyard = static_cast<const nobShipYard*>(shipyards.front());
+        boatReserveShipyardPos_ = reserveShipyard->GetPos();
+        boatReserveShipyardWasProductionDisabled_ = reserveShipyard->IsProductionDisabled();
+    }
+    if(!reserveShipyard)
+        return;
+
+    if(reserveShipyard->GetMode() != nobShipYard::Mode::Boats)
+        owner_.aii.SetShipYardMode(reserveShipyard, false);
+    if(reserveShipyard->IsProductionDisabled())
+        owner_.aii.SetProductionEnabled(reserveShipyard->GetPos(), true);
+}
+
+void AIEconomyController::ReleaseBoatReserveShipyard()
+{
+    if(!boatReserveShipyardPos_.isValid())
+        return;
+
+    for(const nobUsual* shipyard : owner_.aii.GetBuildings(BuildingType::Shipyard))
+    {
+        if(shipyard->GetPos() != boatReserveShipyardPos_)
+            continue;
+
+        const auto* reserveShipyard = static_cast<const nobShipYard*>(shipyard);
+        if(reserveShipyard->GetMode() != nobShipYard::Mode::Ships)
+            owner_.aii.SetShipYardMode(reserveShipyard, true);
+        if(boatReserveShipyardWasProductionDisabled_ && !reserveShipyard->IsProductionDisabled())
+            owner_.aii.SetProductionEnabled(reserveShipyard->GetPos(), false);
+        break;
+    }
+
+    boatReserveShipyardPos_ = MapPoint::Invalid();
+    boatReserveShipyardWasProductionDisabled_ = false;
 }
 
 void AIEconomyController::AdjustDistribution()

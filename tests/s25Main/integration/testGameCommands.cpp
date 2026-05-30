@@ -4,6 +4,7 @@
 
 #include "GamePlayer.h"
 #include "PointOutput.h"
+#include "RoadSegment.h"
 #include "RttrForeachPt.h"
 #include "addons/const_addons.h"
 #include "buildings/nobBaseWarehouse.h"
@@ -12,7 +13,9 @@
 #include "enum_cast.hpp"
 #include "factories/BuildingFactory.h"
 #include "figures/nofPassiveSoldier.h"
+#include "notifications/RoadNote.h"
 #include "postSystem/PostBox.h"
+#include "worldFixtures/terrainHelpers.h"
 #include "worldFixtures/WorldWithGCExecution.h"
 #include "worldFixtures/initGameRNG.hpp"
 #include "nodeObjs/noBase.h"
@@ -54,6 +57,8 @@ static void dummySuppressUnused(std::ostream& out)
 // LCOV_EXCL_STOP
 
 BOOST_AUTO_TEST_SUITE(GameCommandSuite)
+
+using WaterwayCommandWorld = WorldWithGCExecution<1, 24, 22>;
 
 BOOST_FIXTURE_TEST_CASE(PlaceFlagTest, WorldWithGCExecution2P)
 {
@@ -208,6 +213,44 @@ BOOST_FIXTURE_TEST_CASE(BuildRoadTest, WorldWithGCExecution2P)
     this->BuildRoad(flagPt, false, std::vector<Direction>(HQ_RADIUS - (flagPt.x - hqPos.x) + 1, Direction::East));
     for(unsigned i = 0; i <= HQ_RADIUS; i++)
         BOOST_TEST_REQUIRE(world.GetPointRoad(flagPt + MapPoint(i, 0), Direction::East) == PointRoad::None);
+}
+
+BOOST_FIXTURE_TEST_CASE(WaterwayLengthAddonIsEnforcedByGameWorld, WaterwayCommandWorld)
+{
+    RTTR_FOREACH_PT(MapPoint, world.GetSize())
+        world.SetOwner(pt, 1);
+
+    const MapPoint start = world.GetNeighbour(hqPos, Direction::SouthEast);
+    const std::vector<Direction> route(4, Direction::East);
+    const MapPoint end = world.MakeMapPoint(start + Position(4, 0));
+    world.SetFlag(end, curPlayer);
+    const auto water = GetWaterTerrain(world.GetDescription());
+    MapPoint pt = start;
+    for(unsigned i = 0; i + 1 < route.size(); ++i)
+    {
+        pt = world.GetNeighbour(pt, route[i]);
+        for(const Direction dir : helpers::EnumRange<Direction>{})
+            setRightTerrain(world, pt, dir, water);
+    }
+
+    std::vector<RoadNote> notes;
+    const Subscription roadNotes =
+      world.GetNotifications().subscribe<RoadNote>([&notes](const RoadNote& note) { notes.push_back(note); });
+    (void)roadNotes;
+
+    ggs.setSelection(AddonId::MAX_WATERWAY_LENGTH, 0);
+    world.BuildRoad(curPlayer, true, start, route);
+    BOOST_TEST_REQUIRE(notes.size() == 1u);
+    BOOST_TEST(static_cast<int>(notes.back().type) == static_cast<int>(RoadNote::ConstructionFailed));
+    BOOST_TEST(!world.GetSpecObj<noFlag>(start)->GetRoute(Direction::East));
+
+    ggs.setSelection(AddonId::MAX_WATERWAY_LENGTH, 1);
+    world.BuildRoad(curPlayer, true, start, route);
+    BOOST_TEST_REQUIRE(notes.size() == 2u);
+    BOOST_TEST(static_cast<int>(notes.back().type) == static_cast<int>(RoadNote::Constructed));
+    BOOST_TEST_REQUIRE(world.GetSpecObj<noFlag>(start)->GetRoute(Direction::East));
+    BOOST_TEST(static_cast<int>(world.GetSpecObj<noFlag>(start)->GetRoute(Direction::East)->GetRoadType())
+               == static_cast<int>(RoadType::Water));
 }
 
 BOOST_FIXTURE_TEST_CASE(DestroyRoadTest, WorldWithGCExecution2P)

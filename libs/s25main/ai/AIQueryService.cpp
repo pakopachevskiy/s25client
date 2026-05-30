@@ -19,6 +19,7 @@
 #include "nodeObjs/noRoadNode.h"
 #include "nodeObjs/noTree.h"
 #include "pathfinding/FreePathFinder.h"
+#include "pathfinding/FreePathFinderImpl.h"
 #include "pathfinding/PathConditionRoad.h"
 #include "pathfinding/RoadPathFinder.h"
 #include "gameData/TerrainDesc.h"
@@ -640,6 +641,13 @@ bool AIQueryService::FindFreePathForNewRoad(MapPoint start, MapPoint target, std
                                                                  nullptr, &pathParam);
 }
 
+bool AIQueryService::FindFreePathForNewWaterRoad(MapPoint start, MapPoint target, std::vector<Direction>* route,
+                                                 unsigned* length) const
+{
+    return gwb.GetFreePathFinder().FindPath(start, target, false, 100, route, length, nullptr,
+                                            makePathConditionRoad(gwb, true));
+}
+
 bool AIQueryService::FindWeightedFreePathForNewRoad(MapPoint start, MapPoint target,
                                                     const BQPenaltyConfig& bqPenalty,
                                                     std::vector<Direction>* route, unsigned* length,
@@ -679,6 +687,15 @@ bool AIQueryService::FindPathOnRoads(const noRoadNode& start, const noRoadNode& 
                                                 length);
     else
         return gwb.GetRoadPathFinder().PathExists(start, target, false);
+}
+
+bool AIQueryService::FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length) const
+{
+    if(length)
+        return gwb.GetRoadPathFinder().FindPath(start, target, true, std::numeric_limits<unsigned>::max(), nullptr,
+                                                length);
+    else
+        return gwb.GetRoadPathFinder().PathExists(start, target, true);
 }
 
 bool AIQueryService::CanBuildCatapult() const

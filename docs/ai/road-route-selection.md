@@ -256,6 +256,28 @@ Storehouse secondary roads are intentionally less conservative and may create
 longer local loops as long as the route passes the same ownership,
 connectivity, flag-placement, and road-buildability checks.
 
+## Waterway Shortcuts
+
+After the ordinary secondary-road attempt, suitable non-military building jobs
+may also try `BuildAlternativeWaterRoad()`. Waterways are ware-logistics
+shortcuts, not building or worker connections.
+
+The waterway pass:
+
+- searches owned flags within radius `10`,
+- requires both endpoints to remain connected to the land-road system,
+- finds the new route with `FindFreePathForNewWaterRoad()`, using water terrain
+  checks without land-road alternating flag-placement constraints,
+- compares the candidate against the existing ware-capable road-network route,
+- builds only when `newWaterwayLength * 5 < oldWareRouteLength`,
+- requires a reachable warehouse that can provide a helper and boat.
+
+Completed waterways do not receive AI-added interior flags. The economy keeps a
+reserve of two stored boats while waterways exist or are planned. When the
+reserve is low, one shipyard is temporarily switched to small-boat production
+and enabled. Once the reserve is restored, that shipyard returns to the
+existing large-ship policy.
+
 ## Important Non-Obvious Details
 
 - `FindTargetStoreHouseFlag()` uses nearest warehouse by straight map distance,

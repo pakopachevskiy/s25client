@@ -18,6 +18,7 @@ enum class RoadConstructionFailureReason
 {
     Unspecified,
     RouteTooShort,
+    RouteTooLong,
     InvalidStartFlag,
     BlockedRoute,
     EndFlagWrongOwner,

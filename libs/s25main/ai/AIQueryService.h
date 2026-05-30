@@ -67,10 +67,13 @@ public:
                                       const BQPenaltyConfig& bqPenalty) const;
     bool FindFreePathForNewRoad(MapPoint start, MapPoint target, std::vector<Direction>* route = nullptr,
                                 unsigned* length = nullptr) const;
+    bool FindFreePathForNewWaterRoad(MapPoint start, MapPoint target, std::vector<Direction>* route = nullptr,
+                                     unsigned* length = nullptr) const;
     bool FindWeightedFreePathForNewRoad(MapPoint start, MapPoint target, const BQPenaltyConfig& bqPenalty,
                                         std::vector<Direction>* route = nullptr, unsigned* length = nullptr,
                                         bool allowFallback = true) const;
     bool FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr) const;
+    bool FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr) const;
     bool CanBuildCatapult() const;
     bool CanBuildBuildingtype(BuildingType bt) const;
     bool IsPlayerAttackable(unsigned char playerID) const;

@@ -190,6 +190,7 @@ pb::RoadConstructionFailureReason ToProtoFailureReason(RoadEventLogger::RoadCons
     switch(reason)
     {
         case In::RouteTooShort: return pb::ROAD_CONSTRUCTION_FAILURE_REASON_ROUTE_TOO_SHORT;
+        case In::RouteTooLong: return pb::ROAD_CONSTRUCTION_FAILURE_REASON_ROUTE_TOO_LONG;
         case In::InvalidStartFlag: return pb::ROAD_CONSTRUCTION_FAILURE_REASON_INVALID_START_FLAG;
         case In::BlockedRoute: return pb::ROAD_CONSTRUCTION_FAILURE_REASON_BLOCKED_ROUTE;
         case In::EndFlagWrongOwner: return pb::ROAD_CONSTRUCTION_FAILURE_REASON_END_FLAG_WRONG_OWNER;

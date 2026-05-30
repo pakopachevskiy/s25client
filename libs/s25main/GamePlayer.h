@@ -105,6 +105,8 @@ public:
     void RoadDestroyed();
     /// Remove (unoccupied) road from the list
     void DeleteRoad(RoadSegment* rs);
+    /// Returns true if the player has at least one waterway
+    bool HasWaterRoads() const;
     /// Find a carrier for the road and, if needed, request one from the nearest warehouse
     bool FindCarrierForRoad(RoadSegment* rs) const;
     /// Returns true if the given wh does still exist and hence the ptr is valid

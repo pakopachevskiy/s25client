@@ -6,19 +6,23 @@
 #include "RttrForeachPt.h"
 #include "ai/AIPlayer.h"
 #include "ai/aijh/planning/AIConstruction.h"
+#include "ai/aijh/runtime/AIRoadController.h"
 #include "ai/aijh/runtime/AIPlayerJH.h"
 #include "buildings/noBuilding.h"
 #include "buildings/noBuildingSite.h"
 #include "buildings/nobBaseWarehouse.h"
 #include "buildings/nobMilitary.h"
+#include "buildings/nobShipYard.h"
 #include "factories/AIFactory.h"
 #include "factories/BuildingFactory.h"
 #include "helpers/containerUtils.h"
 #include "network/GameMessage_Chat.h"
 #include "notifications/NodeNote.h"
+#include "worldFixtures/terrainHelpers.h"
 #include "worldFixtures/WorldWithGCExecution.h"
 #include "nodeObjs/noFlag.h"
 #include "nodeObjs/noTree.h"
+#include "RoadSegment.h"
 #include "gameTypes/GameTypesOutput.h"
 #include "gameData/BuildingProperties.h"
 #include "gameData/MilitaryConsts.h"
@@ -30,6 +34,7 @@
 namespace {
 // We need border land
 using BiggerWorldWithGCExecution = WorldWithGCExecution<1, 24, 22>;
+using WaterwayWorldWithGCExecution = WorldWithGCExecution<1, 24, 22>;
 using EmptyWorldFixture1P = WorldFixture<CreateEmptyWorld, 1>;
 using EmptyWorldFixture2P = WorldFixture<CreateEmptyWorld, 2>;
 
@@ -60,6 +65,56 @@ struct MockAI final : public AIPlayer
     void OnChatMessage(unsigned /*sendPlayerId*/, ChatDestination, const std::string& /*msg*/) override {}
     // LCOV_EXCL_STOP
 };
+
+void SetAllOwned(GameWorld& world)
+{
+    RTTR_FOREACH_PT(MapPoint, world.GetSize())
+        world.SetOwner(pt, 1);
+}
+
+MapPoint GetRouteEnd(const GameWorldBase& world, MapPoint pt, const std::vector<Direction>& route)
+{
+    for(const Direction dir : route)
+        pt = world.GetNeighbour(pt, dir);
+    return pt;
+}
+
+void SetWaterwayTerrain(GameWorld& world, MapPoint pt, const std::vector<Direction>& route)
+{
+    const auto water = GetWaterTerrain(world.GetDescription());
+    for(std::size_t i = 0; i + 1 < route.size(); ++i)
+    {
+        pt = world.GetNeighbour(pt, route[i]);
+        for(const Direction dir : helpers::EnumRange<Direction>{})
+            setRightTerrain(world, pt, dir, water);
+    }
+}
+
+struct WaterwayShortcut
+{
+    MapPoint source;
+    MapPoint target;
+    std::vector<Direction> waterRoute{Direction::East, Direction::East};
+};
+
+WaterwayShortcut CreateWaterwayShortcut(GameWorld& world, unsigned playerId, bool buildLandDetour)
+{
+    SetAllOwned(world);
+    WaterwayShortcut shortcut;
+    shortcut.source = world.GetNeighbour(world.GetPlayer(playerId).GetHQPos(), Direction::SouthEast);
+    shortcut.target = GetRouteEnd(world, shortcut.source, shortcut.waterRoute);
+    world.SetFlag(shortcut.target, playerId);
+    if(buildLandDetour)
+    {
+        std::vector<Direction> landRoute(5, Direction::SouthEast);
+        landRoute.insert(landRoute.end(), 2, Direction::East);
+        landRoute.insert(landRoute.end(), 5, Direction::NorthWest);
+        world.BuildRoad(playerId, false, shortcut.source, landRoute);
+        BOOST_TEST_REQUIRE(world.GetSpecObj<noFlag>(shortcut.source)->GetRoute(Direction::SouthEast));
+    }
+    SetWaterwayTerrain(world, shortcut.source, shortcut.waterRoute);
+    return shortcut;
+}
 } // namespace
 
 // Note game command execution is emulated to be like the ones send via network:
@@ -291,6 +346,99 @@ BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoad_StorehousePolicyBuildsLongerValidRo
     BOOST_TEST(ai.GetConstruction().BuildAlternativeRoad(sourceFlag, route, AIJH::AlternativeRoadPolicy::BuildFirstValid));
     BOOST_TEST(!route.empty());
     BOOST_TEST(ai.FetchGameCommands().size() == 1u);
+}
+
+BOOST_FIXTURE_TEST_CASE(BuildAlternativeWaterRoad_BuildsBeneficialWareShortcut, WaterwayWorldWithGCExecution)
+{
+    const WaterwayShortcut shortcut = CreateWaterwayShortcut(world, curPlayer, true);
+    const noFlag* sourceFlag = world.GetSpecObj<noFlag>(shortcut.source);
+    BOOST_TEST_REQUIRE(sourceFlag);
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    std::vector<Direction> route;
+    BOOST_TEST_REQUIRE(ai.GetConstruction().BuildAlternativeWaterRoad(sourceFlag, route));
+    BOOST_TEST(route == shortcut.waterRoute, boost::test_tools::per_element());
+
+    auto commands = ai.FetchGameCommands();
+    BOOST_TEST_REQUIRE(commands.size() == 1u);
+    commands.front()->Execute(world, curPlayer);
+    BOOST_TEST_REQUIRE(sourceFlag->GetRoute(Direction::East));
+    BOOST_TEST(static_cast<int>(sourceFlag->GetRoute(Direction::East)->GetRoadType())
+               == static_cast<int>(RoadType::Water));
+}
+
+BOOST_FIXTURE_TEST_CASE(BuildAlternativeWaterRoad_RequiresAvailableBoat, WaterwayWorldWithGCExecution)
+{
+    const WaterwayShortcut shortcut = CreateWaterwayShortcut(world, curPlayer, true);
+    auto* hq = world.GetSpecObj<nobBaseWarehouse>(hqPos);
+    BOOST_TEST_REQUIRE(hq);
+    hq->Clear();
+    Inventory goods;
+    goods.Add(Job::Helper);
+    hq->AddGoods(goods, true);
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    std::vector<Direction> route;
+    BOOST_TEST(!ai.GetConstruction().BuildAlternativeWaterRoad(world.GetSpecObj<noFlag>(shortcut.source), route));
+    BOOST_TEST(ai.FetchGameCommands().empty());
+}
+
+BOOST_FIXTURE_TEST_CASE(Waterways_DoNotProvideLandConnectivityOrInteriorFlagsAndSurviveCleanup, WaterwayWorldWithGCExecution)
+{
+    const WaterwayShortcut shortcut = CreateWaterwayShortcut(world, curPlayer, false);
+    world.BuildRoad(curPlayer, true, shortcut.source, shortcut.waterRoute);
+    const noFlag* targetFlag = world.GetSpecObj<noFlag>(shortcut.target);
+    BOOST_TEST_REQUIRE(targetFlag);
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    BOOST_TEST(!ai.GetConstruction().IsConnectedToRoadSystem(targetFlag));
+
+    AIJH::AIRoadController roads(ai);
+    roads.HandleRoadConstructionComplete(shortcut.target, Direction::West);
+    BOOST_TEST(ai.FetchGameCommands().empty());
+    BOOST_TEST(!roads.RemoveUnusedRoad(*targetFlag, boost::none));
+    BOOST_TEST(ai.FetchGameCommands().empty());
+    BOOST_TEST_REQUIRE(targetFlag->GetRoute(Direction::West));
+    BOOST_TEST(static_cast<int>(targetFlag->GetRoute(Direction::West)->GetRoadType())
+               == static_cast<int>(RoadType::Water));
+}
+
+BOOST_FIXTURE_TEST_CASE(BoatReserve_SwitchesAndEnablesShipyardForExistingWaterway, WaterwayWorldWithGCExecution)
+{
+    const WaterwayShortcut shortcut = CreateWaterwayShortcut(world, curPlayer, false);
+    auto* hq = world.GetSpecObj<nobBaseWarehouse>(hqPos);
+    BOOST_TEST_REQUIRE(hq);
+    hq->Clear();
+    Inventory goods;
+    goods.Add(Job::Helper);
+    hq->AddGoods(goods, true);
+    world.BuildRoad(curPlayer, true, shortcut.source, shortcut.waterRoute);
+
+    MapPoint shipyardPos = MapPoint::Invalid();
+    for(const MapPoint pt : world.GetPointsInRadius(hqPos, 6))
+    {
+        if(world.GetBQ(pt, curPlayer) == BuildingQuality::Castle)
+        {
+            shipyardPos = pt;
+            break;
+        }
+    }
+    BOOST_TEST_REQUIRE(shipyardPos.isValid());
+    auto* shipyard = dynamic_cast<nobShipYard*>(
+      BuildingFactory::CreateBuilding(world, BuildingType::Shipyard, shipyardPos, curPlayer, Nation::Romans));
+    BOOST_TEST_REQUIRE(shipyard);
+    shipyard->SetMode(nobShipYard::Mode::Ships);
+    shipyard->SetProductionEnabled(false);
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    for(unsigned gf = 0; gf < 9; ++gf)
+        ai.RunGF(gf, false);
+    ai.RunGF(50, false);
+    for(auto& command : ai.FetchGameCommands())
+        command->Execute(world, curPlayer);
+
+    BOOST_TEST(static_cast<int>(shipyard->GetMode()) == static_cast<int>(nobShipYard::Mode::Boats));
+    BOOST_TEST(!shipyard->IsProductionDisabled());
 }
 
 BOOST_FIXTURE_TEST_CASE(BuildWoodIndustry, WorldWithGCExecution<1>)

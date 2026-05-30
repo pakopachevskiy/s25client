@@ -5,6 +5,7 @@
 #include "AIConstruction.h"
 #include "BuildingPlanner.h"
 #include "EventManager.h"
+#include "FindWhConditions.h"
 #include "GlobalGameSettings.h"
 #include "Jobs.h"
 #include "Point.h"
@@ -255,6 +256,7 @@ void AIConstruction::ConstructionsExecuted()
 {
     constructionlocations.clear();
     std::fill(constructionorders.begin(), constructionorders.end(), 0u);
+    waterRoadPlanned_ = false;
 }
 
 bool AIConstruction::IsGlobalSearchOnCooldown(const BuildingType type) const
@@ -587,6 +589,16 @@ bool AIConstruction::BuildRoad(const noRoadNode* start, const noRoadNode* target
     return false;
 }
 
+bool AIConstruction::BuildWaterRoad(const noRoadNode* start, const noRoadNode* target, std::vector<Direction>& route)
+{
+    if(route.empty() && !aii.FindFreePathForNewWaterRoad(start->GetPos(), target->GetPos(), &route))
+        return false;
+
+    aii.BuildRoad(start->GetPos(), true, route);
+    waterRoadPlanned_ = true;
+    return true;
+}
+
 bool AIConstruction::IsConnectedToRoadSystem(const noFlag* flag) const
 {
     noFlag* targetFlag = FindTargetStoreHouseFlag(flag->GetPos());
@@ -857,6 +869,52 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
                 constructionlocations.push_back(flag->GetPos());
                 return true;
             }
+        }
+    }
+
+    return false;
+}
+
+bool AIConstruction::BuildAlternativeWaterRoad(const noFlag* flag, std::vector<Direction>& route)
+{
+    constexpr unsigned short maxRoadLength = 10;
+    constexpr unsigned short lengthFactor = 5;
+
+    if(!IsConnectedToRoadSystem(flag))
+        return false;
+
+    const FW::HasWareAndFigure hasBoatCarrier(GoodType::Boat, Job::Helper, false);
+    for(const noFlag* candidateFlag : FindFlags(flag->GetPos(), maxRoadLength))
+    {
+        if(candidateFlag == flag || !IsConnectedToRoadSystem(candidateFlag))
+            continue;
+
+        unsigned oldLength = 0;
+        if(!aii.FindPathForWareOnRoads(*flag, *candidateFlag, &oldLength)
+           || aii.gwb.CalcDistance(flag->GetPos(), candidateFlag->GetPos()) * lengthFactor >= oldLength)
+        {
+            continue;
+        }
+
+        std::vector<Direction> candidateRoute;
+        unsigned newLength = 0;
+        if(!aii.FindFreePathForNewWaterRoad(flag->GetPos(), candidateFlag->GetPos(), &candidateRoute, &newLength)
+           || newLength * lengthFactor >= oldLength)
+        {
+            continue;
+        }
+
+        if(!aii.FindWarehouse(*flag, hasBoatCarrier, false, false)
+           && !aii.FindWarehouse(*candidateFlag, hasBoatCarrier, false, false))
+        {
+            continue;
+        }
+
+        route = std::move(candidateRoute);
+        if(BuildWaterRoad(flag, candidateFlag, route))
+        {
+            constructionlocations.push_back(flag->GetPos());
+            return true;
         }
     }
 

@@ -63,8 +63,10 @@ void BuildJob::ExecuteJob()
 
         case JobState::ExecutingRoad2: TryToBuildSecondaryRoad(); break;
         case JobState::ExecutingRoad2_2:
-            // maybe check whether this road construction succeeded as well?
             aijh.RecalcGround(target, route);
+            TryToBuildAlternativeWaterRoad();
+            break;
+        case JobState::ExecutingWaterRoad:
             state = JobState::Finished;
             break;
 
@@ -315,6 +317,16 @@ void BuildJob::TryToBuildSecondaryRoad()
     {
         state = JobState::ExecutingRoad2_2;
     } else
+        TryToBuildAlternativeWaterRoad();
+}
+
+void BuildJob::TryToBuildAlternativeWaterRoad()
+{
+    const auto* houseFlag =
+      aijh.GetWorld().GetSpecObj<noFlag>(aijh.GetWorld().GetNeighbour(target, Direction::SouthEast));
+    if(houseFlag && aijh.GetConstruction().BuildAlternativeWaterRoad(houseFlag, route))
+        state = JobState::ExecutingWaterRoad;
+    else
         state = JobState::Finished;
 }
 
