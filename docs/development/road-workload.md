@@ -6,17 +6,18 @@ means, how the snapshot is calculated, and how the AI Debug window renders it.
 ## Purpose
 
 The road-workload snapshot estimates which parts of a player's road network
-are likely to carry the most ware traffic. It is a diagnostic aid for
-inspecting logistics topology and route selection. It is not a measurement of
-actual carrier throughput, queue length, or delivered ware count.
+are likely to carry the most ware traffic. It is used both as a diagnostic aid
+for inspecting logistics topology and as a low-frequency AI signal for adding
+shortcut roads around hot segments. It is not a measurement of actual carrier
+throughput, queue length, or delivered ware count.
 
 Each score is attached to an owned flag-to-flag `RoadSegment`. A score is the
 number of eligible ware-flow edges whose current ware-mode route crosses that
 segment. Every eligible edge contributes exactly `1`, regardless of ware
 quantity, production rate, building productivity, or consumer priority value.
 
-The AI does not currently use these scores when building roads. Selecting the
-overlay does not change AI behavior.
+Selecting the overlay does not change AI behavior; it only renders the latest
+cached values.
 
 ## Ware-Flow Model
 
@@ -118,6 +119,15 @@ Each cached node contains `std::optional<unsigned>`:
 The cache is replaced as a whole during refresh. Debug rendering only reads
 the cached values.
 
+The refresh also stores one segment-level record per registered road:
+
+```text
+endpoint flag positions, segment score, segment length, water-road marker
+```
+
+That segment list feeds the AI's global workload-bypass activation. The tile
+cache remains the source for debug overlay rendering.
+
 ## Refresh Cadence
 
 `AIPlayerJH` owns one `AIRoadWorkload` instance. It refreshes the snapshot:
@@ -129,6 +139,12 @@ the cached values.
 if((gf + playerId * 13) % 1500 == 0)
 ```
 
+3. during the player-staggered global workload-bypass cadence:
+
+```cpp
+if((gf + playerId * 23) % 2500 == 0)
+```
+
 The stagger avoids recalculating all AI players on the same game frame.
 Between refreshes, overlay values may be stale for up to `1500 GF`. That is
 intentional: this is a low-frequency diagnostic snapshot, not live transport
@@ -138,6 +154,24 @@ Refresh cost is recorded in the `CalculateRoadWorkload` runtime-profiler
 section. Its work-unit value is the number of attempted pair routes after
 same-endpoint pairs have been skipped. Disconnected attempts count as work
 units even though they do not add a score.
+
+## AI Bypass Use
+
+After the `2500 GF` refresh, `AIPlayerJH` inspects hot land segments with a
+workload score of at least `600`, capped to the first `8` sorted hotspots. For
+each candidate, `AIConstruction::BuildAlternativeRoadBypassingSegment()` looks
+for a new land road whose current road-network path crosses the hot segment.
+
+The build attempt is intentionally conservative:
+
+- candidate endpoint flags are searched near both hot-segment endpoints,
+- the proposed free-terrain road must be no more than `24` steps,
+- the new road's effective length, including road-route BQ penalty, must be
+  lower than the current road path that uses the hot segment,
+- an already existing path around the hot segment suppresses the build when it
+  is no longer than the proposed new road.
+
+Only one bypass can be queued per activation.
 
 ## Overlay Rendering
 
@@ -182,12 +216,16 @@ segment displays `1` for the remaining producer-to-warehouse route.
 The important files are:
 
 - `libs/s25main/ai/aijh/runtime/AIRoadWorkload.*`: builds eligible edges,
-  calculates routes, stores scores, and expands segment values onto tiles
+  calculates routes, stores segment scores, and expands segment values onto
+  tiles
 - `libs/s25main/pathfinding/RoadPathFinder.*`: optionally returns traversed
   road segments while omitting ship hops
 - `libs/s25main/ai/AIQueryService.*`: exposes ware-mode road path queries and
-  registered player roads
-- `libs/s25main/ai/aijh/runtime/AIPlayerJH.cpp`: owns the refresh cadence
+  registered player roads, including path searches that avoid one segment
+- `libs/s25main/ai/aijh/planning/AIConstruction.*`: builds global workload
+  bypass shortcuts
+- `libs/s25main/ai/aijh/runtime/AIPlayerJH.cpp`: owns the refresh and bypass
+  cadence
 - `libs/s25main/ai/aijh/debug/AIDebugView.h`: exposes cached debug reads
 - `libs/s25main/ingameWindows/iwAIDebug.cpp`: appends the overlay and renders
   cached numeric values

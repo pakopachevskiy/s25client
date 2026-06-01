@@ -17,7 +17,9 @@
 #include "helpers/EnumRange.h"
 #include "world/GameWorldBase.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <iterator>
 #include <unordered_map>
 #include <utility>
 
@@ -128,15 +130,24 @@ void AIRoadWorkload::Refresh()
     }
 
     nodeValues_.assign(world_.GetSize().x * world_.GetSize().y, std::nullopt);
-    for(const auto& segmentScore : segmentScores)
+    segments_.clear();
+    segments_.reserve(segmentScores.size());
+    for(const RoadSegment* road : queries_.GetRoads())
     {
-        const RoadSegment& segment = *segmentScore.first;
+        const auto scoreIt = segmentScores.find(road);
+        if(scoreIt == segmentScores.end())
+            continue;
+
+        const RoadSegment& segment = *road;
+        segments_.push_back({segment.GetF1()->GetPos(), segment.GetF2()->GetPos(), scoreIt->second,
+                             segment.GetLength(), segment.GetRoadType() == RoadType::Water});
+
         MapPoint pt = segment.GetF1()->GetPos();
         for(unsigned i = 0; i < segment.GetLength(); ++i)
         {
             pt = world_.GetNeighbour(pt, segment.GetRoute(i));
             if(i + 1 < segment.GetLength())
-                nodeValues_[world_.GetIdx(pt)] = segmentScore.second;
+                nodeValues_[world_.GetIdx(pt)] = scoreIt->second;
         }
     }
 
@@ -148,6 +159,22 @@ std::optional<unsigned> AIRoadWorkload::Get(const MapPoint pt) const
     if(!pt.isValid() || pt.x >= world_.GetSize().x || pt.y >= world_.GetSize().y)
         return std::nullopt;
     return nodeValues_[world_.GetIdx(pt)];
+}
+
+std::vector<RoadWorkloadSegment> AIRoadWorkload::GetHotSegments(const unsigned minWorkload) const
+{
+    std::vector<RoadWorkloadSegment> result;
+    std::copy_if(segments_.begin(), segments_.end(), std::back_inserter(result),
+                 [minWorkload](const RoadWorkloadSegment& segment) {
+                     return segment.workload >= minWorkload;
+                 });
+    std::stable_sort(result.begin(), result.end(), [](const RoadWorkloadSegment& lhs,
+                                                      const RoadWorkloadSegment& rhs) {
+        if(lhs.workload != rhs.workload)
+            return lhs.workload > rhs.workload;
+        return lhs.length > rhs.length;
+    });
+    return result;
 }
 
 } // namespace AIJH

@@ -79,6 +79,7 @@ set(s25Main_SRCS
         ai/RatedPoint.h
         ai/aijh/config/WeightParser.h
         ai/aijh/config/WeightParams.h
+        ai/aijh/RoadWorkloadSegment.h
 )
 
 set(WARES_LOG_PROTO ${PROJECT_SOURCE_DIR}/external/proto-repo/wares_log.proto)

@@ -690,6 +690,18 @@ bool AIQueryService::FindPathOnRoads(const noRoadNode& start, const noRoadNode& 
         return gwb.GetRoadPathFinder().PathExists(start, target, false);
 }
 
+bool AIQueryService::FindPathOnRoadsAvoidingSegment(const noRoadNode& start, const noRoadNode& target,
+                                                    const RoadSegment& forbidden, unsigned* length,
+                                                    std::vector<const RoadSegment*>* traversedSegments) const
+{
+    if(length || traversedSegments)
+        return gwb.GetRoadPathFinder().FindPath(start, target, false, std::numeric_limits<unsigned>::max(), &forbidden,
+                                                length, nullptr, nullptr, traversedSegments);
+    else
+        return gwb.GetRoadPathFinder().PathExists(start, target, false, std::numeric_limits<unsigned>::max(),
+                                                  &forbidden);
+}
+
 bool AIQueryService::FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length,
                                             std::vector<const RoadSegment*>* traversedSegments) const
 {

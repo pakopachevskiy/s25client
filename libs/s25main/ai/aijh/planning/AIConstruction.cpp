@@ -11,6 +11,7 @@
 #include "Point.h"
 #include "addons/const_addons.h"
 #include "ai/AIInterface.h"
+#include "ai/aijh/RoadWorkloadSegment.h"
 #include "ai/aijh/config/AIConfig.h"
 #include "ai/aijh/debug/AIRuntimeProfiler.h"
 #include "ai/aijh/runtime/AIPlanningContext.h"
@@ -28,6 +29,7 @@
 #include "gameTypes/Inventory.h"
 #include "gameTypes/JobTypes.h"
 #include "gameData/BuildingProperties.h"
+#include "helpers/EnumRange.h"
 
 #include "s25util/Log.h"
 #include "s25util/warningSuppression.h"
@@ -327,6 +329,30 @@ namespace {
         double score = std::numeric_limits<double>::infinity();
         std::vector<Direction> route;
     };
+
+    struct WorkloadBypassCandidate
+    {
+        const noFlag* start = nullptr;
+        const noFlag* target = nullptr;
+        unsigned oldLength = 0;
+        unsigned newLength = 0;
+        double effectiveNewLength = std::numeric_limits<double>::infinity();
+        std::vector<Direction> route;
+    };
+
+    const RoadSegment* FindLandRoadSegmentBetween(const noFlag& lhs, const noFlag& rhs,
+                                                  const RoadWorkloadSegment& hotSegment)
+    {
+        for(const Direction dir : helpers::EnumRange<Direction>{})
+        {
+            const RoadSegment* segment = lhs.GetRoute(dir);
+            if(!segment || segment->GetRoadType() == RoadType::Water || segment->GetLength() != hotSegment.length)
+                continue;
+            if(&segment->GetOtherFlag(lhs) == &rhs)
+                return segment;
+        }
+        return nullptr;
+    }
 } // namespace
 
 std::vector<const noFlag*> AIConstruction::FindFlags(const MapPoint pt, unsigned short radius)
@@ -872,6 +898,157 @@ bool AIConstruction::BuildAlternativeRoad(const noFlag* flag, std::vector<Direct
         }
     }
 
+    return false;
+}
+
+bool AIConstruction::BuildAlternativeRoadBypassingSegment(const RoadWorkloadSegment& hotSegment,
+                                                          std::vector<Direction>& route)
+{
+    route.clear();
+    if(hotSegment.waterRoad)
+        return false;
+
+    const auto* hotFlag1 = aii.gwb.GetSpecObj<noFlag>(hotSegment.flag1);
+    const auto* hotFlag2 = aii.gwb.GetSpecObj<noFlag>(hotSegment.flag2);
+    if(!hotFlag1 || !hotFlag2 || hotFlag1->GetPlayer() != aii.GetPlayerId()
+       || hotFlag2->GetPlayer() != aii.GetPlayerId())
+    {
+        return false;
+    }
+
+    const RoadSegment* hotRoad = FindLandRoadSegmentBetween(*hotFlag1, *hotFlag2, hotSegment);
+    if(!hotRoad)
+        hotRoad = FindLandRoadSegmentBetween(*hotFlag2, *hotFlag1, hotSegment);
+    if(!hotRoad)
+        return false;
+
+    constexpr unsigned short maxSearchRadius = 10;
+    constexpr std::size_t maxCandidateFlagsPerEndpoint = 12;
+    constexpr unsigned maxNewRoadLength = 24;
+
+    auto getCandidates = [this, maxSearchRadius, maxCandidateFlagsPerEndpoint](const noFlag& endpoint) {
+        std::vector<const noFlag*> flags = FindFlags(endpoint.GetPos(), maxSearchRadius);
+        flags.insert(flags.begin(), &endpoint);
+        helpers::makeUniqueStable(flags);
+        if(flags.size() > maxCandidateFlagsPerEndpoint)
+            flags.resize(maxCandidateFlagsPerEndpoint);
+        return flags;
+    };
+
+    const std::vector<const noFlag*> startCandidates = getCandidates(*hotFlag1);
+    const std::vector<const noFlag*> targetCandidates = getCandidates(*hotFlag2);
+    const auto& bqPenaltyConfig = aijh.GetConfig().bqPenalty;
+    const double roadRouteBQPenalty = bqPenaltyConfig.roadRoute;
+    const bool useWeightedRefinement =
+      roadRouteBQPenalty > 0.0 && bqPenaltyConfig.roadRouteWeightedSearch
+      && bqPenaltyConfig.roadRouteWeightedRefinementTopN > 0;
+
+    WorkloadBypassCandidate bestCandidate;
+    std::vector<const RoadSegment*> traversedSegments;
+    for(const noFlag* start : startCandidates)
+    {
+        if(!start || !IsConnectedToRoadSystem(start))
+            continue;
+
+        for(const noFlag* target : targetCandidates)
+        {
+            if(!target || start == target || !IsConnectedToRoadSystem(target))
+                continue;
+
+            const unsigned straightDistance = aii.gwb.CalcDistance(start->GetPos(), target->GetPos());
+            if(straightDistance > maxNewRoadLength)
+                continue;
+
+            unsigned oldLength = 0;
+            traversedSegments.clear();
+            if(!aii.FindPathOnRoads(*start, *target, &oldLength, &traversedSegments)
+               || std::find(traversedSegments.begin(), traversedSegments.end(), hotRoad) == traversedSegments.end())
+            {
+                continue;
+            }
+            if(straightDistance >= oldLength)
+                continue;
+
+            std::vector<Direction> candidateRoute;
+            unsigned newLength = 0;
+            if(!aii.FindFreePathForNewRoad(start->GetPos(), target->GetPos(), &candidateRoute, &newLength)
+               || newLength < 2 || newLength > maxNewRoadLength)
+            {
+                continue;
+            }
+
+            unsigned maxNonFlaggableRun = GetMaxNonFlaggableRun(aii, aijh, start->GetPos(), candidateRoute);
+            if(maxNonFlaggableRun > 2)
+                continue;
+
+            const double bqPenalty = (roadRouteBQPenalty > 0.0)
+                                       ? aii.Queries().EstimateRoadRouteBQPenalty(start->GetPos(), candidateRoute,
+                                                                                  bqPenaltyConfig)
+                                       : 0.0;
+            double effectiveNewLength = newLength + roadRouteBQPenalty * bqPenalty;
+            std::vector<Direction> routeToBuild = candidateRoute;
+
+            if(useWeightedRefinement)
+            {
+                std::vector<Direction> weightedRoute;
+                unsigned weightedLength = 0;
+                if(aii.FindWeightedFreePathForNewRoad(start->GetPos(), target->GetPos(), bqPenaltyConfig,
+                                                      &weightedRoute, &weightedLength, false)
+                   && weightedLength >= 2 && weightedLength <= maxNewRoadLength)
+                {
+                    maxNonFlaggableRun = GetMaxNonFlaggableRun(aii, aijh, start->GetPos(), weightedRoute);
+                    if(maxNonFlaggableRun <= 2)
+                    {
+                        const double weightedBQPenalty =
+                          aii.Queries().EstimateRoadRouteBQPenalty(start->GetPos(), weightedRoute, bqPenaltyConfig);
+                        const double weightedEffectiveNewLength =
+                          weightedLength + roadRouteBQPenalty * weightedBQPenalty;
+                        if(weightedEffectiveNewLength < effectiveNewLength)
+                        {
+                            newLength = weightedLength;
+                            effectiveNewLength = weightedEffectiveNewLength;
+                            routeToBuild = std::move(weightedRoute);
+                        }
+                    }
+                }
+            }
+
+            unsigned existingBypassLength = 0;
+            if(aii.FindPathOnRoadsAvoidingSegment(*start, *target, *hotRoad, &existingBypassLength)
+               && existingBypassLength <= newLength)
+            {
+                continue;
+            }
+            if(effectiveNewLength >= oldLength)
+                continue;
+
+            const double bestImprovement = bestCandidate.start
+                                             ? bestCandidate.oldLength - bestCandidate.effectiveNewLength
+                                             : -std::numeric_limits<double>::infinity();
+            const double improvement = oldLength - effectiveNewLength;
+            if(!bestCandidate.start || improvement > bestImprovement
+               || (improvement == bestImprovement && newLength < bestCandidate.newLength))
+            {
+                bestCandidate.start = start;
+                bestCandidate.target = target;
+                bestCandidate.oldLength = oldLength;
+                bestCandidate.newLength = newLength;
+                bestCandidate.effectiveNewLength = effectiveNewLength;
+                bestCandidate.route = std::move(routeToBuild);
+            }
+        }
+    }
+
+    if(!bestCandidate.start)
+        return false;
+
+    route = bestCandidate.route;
+    if(BuildRoad(bestCandidate.start, bestCandidate.target, route))
+    {
+        constructionlocations.push_back(bestCandidate.start->GetPos());
+        constructionlocations.push_back(bestCandidate.target->GetPos());
+        return true;
+    }
     return false;
 }
 

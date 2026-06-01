@@ -29,6 +29,7 @@ class AIPlanningContext;
 class BuildingPlanner;
 class BuildJob;
 class ConnectJob;
+struct RoadWorkloadSegment;
 
 enum class AlternativeRoadPolicy
 {
@@ -78,6 +79,8 @@ public:
     /// Tries to build a second road to a flag.
     bool BuildAlternativeRoad(const noFlag* flag, std::vector<Direction>& route,
                               AlternativeRoadPolicy policy = AlternativeRoadPolicy::ShortcutOnly);
+    /// Tries to build a shortcut whose current road path crosses a hot workload segment.
+    bool BuildAlternativeRoadBypassingSegment(const RoadWorkloadSegment& hotSegment, std::vector<Direction>& route);
     /// Tries to build a waterway shortcut between two land-connected flags.
     bool BuildAlternativeWaterRoad(const noFlag* flag, std::vector<Direction>& route);
 

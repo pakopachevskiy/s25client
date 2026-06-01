@@ -38,6 +38,10 @@
 
 namespace {
 
+constexpr unsigned kRoadWorkloadBypassIntervalGF = 2500;
+constexpr unsigned kRoadWorkloadBypassThreshold = 600;
+constexpr unsigned kRoadWorkloadBypassMaxSegmentsPerPass = 8;
+
 void HandleBuildingNote(AIEventManager& eventMgr, const BuildingNote& note)
 {
     std::unique_ptr<AIEvent::Base> ev;
@@ -321,6 +325,12 @@ void AIPlayerJH::RunGF(const unsigned gf, bool gfisnwf)
         roadWorkload_->Refresh();
     }
 
+    if((gf + playerId * 23) % kRoadWorkloadBypassIntervalGF == 0)
+    {
+        const ScopedAIRuntimeProfile roadWorkloadHotspotsProfile(AIRuntimeProfileSection::CheckRoadWorkloadHotspots);
+        TryBuildRoadWorkloadBypass();
+    }
+
     if((gf + playerId * 19) % 1000 == 0)
     {
         const ScopedAIRuntimeProfile troopsLimitProfile(AIRuntimeProfileSection::UpdateTroopsLimit);
@@ -342,6 +352,23 @@ void AIPlayerJH::RunGF(const unsigned gf, bool gfisnwf)
 }
 
 void AIPlayerJH::OnChatMessage(unsigned /*sendPlayerId*/, ChatDestination, const std::string& /*msg*/) {}
+
+void AIPlayerJH::TryBuildRoadWorkloadBypass()
+{
+    roadWorkload_->Refresh();
+
+    std::vector<Direction> route;
+    unsigned checkedSegments = 0;
+    for(const RoadWorkloadSegment& hotSegment : roadWorkload_->GetHotSegments(kRoadWorkloadBypassThreshold))
+    {
+        if(hotSegment.waterRoad)
+            continue;
+        if(checkedSegments++ >= kRoadWorkloadBypassMaxSegmentsPerPass)
+            break;
+        if(construction->BuildAlternativeRoadBypassingSegment(hotSegment, route))
+            break;
+    }
+}
 
 bool AIPlayerJH::TestDefeat()
 {

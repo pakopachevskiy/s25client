@@ -25,10 +25,10 @@ constexpr std::array<std::string_view, static_cast<unsigned>(AIRuntimeProfileSec
   "ExecuteConstructionJobs",  "ExecuteConnectJobs",         "ExecuteGlobalBuildJobs", "ExecuteBuildJobs",
   "SelectTargetAttrition",    "AttritionGetPotential",      "AttritionRecaptureScan", "AttritionPickRecap",
   "AttritionForceAdv",        "AttritionNearDensity",       "AttritionFallbackBiting","EvaluateCaptureRisks",
-  "TryToAttack",              "TrySeaAttack",               "CheckEconomicHotspots",  "UpdateTroopsLimit",
-  "AdjustSettings",           "PlanNewBuildings",           "UpdateTroopsLimitScan",  "UpdateTroopsLimitScore",
-  "UpdateTroopsLimitDist",    "UpdateTroopsLimitApply",      "FindFreePathRoad",      "FindWeightedPathRoad",
-  "FindWeightedPathFallback", "CalculateRoadWorkload"};
+  "TryToAttack",              "TrySeaAttack",               "CheckEconomicHotspots",  "CheckRoadWorkload",
+  "UpdateTroopsLimit",        "AdjustSettings",             "PlanNewBuildings",       "UpdateTroopsLimitScan",
+  "UpdateTroopsLimitScore",   "UpdateTroopsLimitDist",      "UpdateTroopsLimitApply", "FindFreePathRoad",
+  "FindWeightedPathRoad",     "FindWeightedPathFallback",   "CalculateRoadWorkload"};
 
 double ToMilliseconds(const std::uint64_t nanoseconds) { return static_cast<double>(nanoseconds) / 1'000'000.0; }
 

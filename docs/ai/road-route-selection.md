@@ -10,8 +10,10 @@ See also:
 - [position-finding.md](position-finding.md) — picks the building
   position whose flag is the source of these connection searches.
 
-The AI does not run a global road-network optimizer. Road construction is a
-local heuristic layered on top of two lower-level pathfinders:
+The AI does not run a full global road-network optimizer. Most road
+construction is a local heuristic layered on top of two lower-level
+pathfinders, with one bounded global pass that looks for high-workload road
+segments and tries to add a relieving shortcut.
 
 - `AIConstruction::ConnectFlagToRoadSytem()` chooses which nearby existing flag
   to connect to.
@@ -31,6 +33,9 @@ considers the "best" road.
   `AIConstruction::ConnectFlagToRoadSytem()`.
 - For non-military buildings, `BuildJob::TryToBuildSecondaryRoad()` may later
   call `BuildAlternativeRoad()` to add a shortcut.
+- Independently of building jobs, `AIPlayerJH::RunGF()` periodically refreshes
+  the road-workload snapshot and may call
+  `BuildAlternativeRoadBypassingSegment()` for a globally hot segment.
 
 ## What the AI Optimizes For
 
@@ -256,6 +261,34 @@ Storehouse secondary roads are intentionally less conservative and may create
 longer local loops as long as the route passes the same ownership,
 connectivity, flag-placement, and road-buildability checks.
 
+## Global Workload Bypasses
+
+The AI also has a low-frequency global activation for road segments that the
+workload model considers hot. Every `2500 GF`, staggered by player id, it
+refreshes `AIRoadWorkload` and inspects the highest-scoring land road segments
+whose workload is at least `600`.
+
+For each inspected hot segment, the bypass search:
+
+- looks at owned flags near each endpoint, including the endpoint flags
+  themselves,
+- caps each endpoint side to the nearest `12` candidate flags within radius
+  `10`,
+- requires the current land-road path between the candidate pair to cross the
+  hot segment,
+- skips pairs whose straight map distance is already no better than the
+  current road distance,
+- finds a new free-terrain land road of at most `24` steps,
+- rejects routes with more than `2` consecutive non-flaggable points,
+- applies the same road-route BQ penalty and optional weighted refinement used
+  by other road-building code,
+- skips the pair if an existing path that avoids the hot segment is already no
+  longer than the proposed new road.
+
+Only one best bypass is built per activation. Unlike the building-local
+secondary road pass, this trigger is not tied to a newly completed building;
+the hot workload segment chooses the area of interest.
+
 ## Waterway Shortcuts
 
 After the ordinary secondary-road attempt, suitable non-military building jobs
@@ -295,9 +328,9 @@ existing large-ship policy.
   and future interior flags.
 - `MinorRoadImprovements()` currently returns immediately into `BuildRoad()`.
   The code below that early return is effectively disabled.
-- The construction heuristic is local and greedy. It does not restructure the
-  network globally or reason about future traffic beyond the limited
-  alternative-road pass.
+- The construction heuristics are greedy. The workload bypass activation scans
+  globally for hot segments, but each build attempt still uses a bounded local
+  candidate search around that segment's endpoints.
 
 ## Practical Takeaways
 
@@ -305,8 +338,8 @@ existing large-ship policy.
   short route to the nearest warehouse.
 - It avoids routes that create long non-flaggable stretches, because those are
   fragile for flag placement and logistics.
-- It does not account for live carrier congestion when selecting the endpoint
-  for a new road.
+- Main building-connection routing does not account for live carrier
+  congestion when selecting the endpoint for a new road.
 - If a route choice looks odd in-game, likely causes are:
   - a better flag was outside the search radius,
   - a better flag was beyond the `30`-candidate cap,

@@ -7,6 +7,7 @@
 #include "Ware.h"
 #include "ai/AIPlayer.h"
 #include "ai/AIQueryService.h"
+#include "ai/aijh/config/AIConfig.h"
 #include "ai/aijh/planning/AIConstruction.h"
 #include "ai/aijh/runtime/AIRoadController.h"
 #include "ai/aijh/runtime/AIRoadWorkload.h"
@@ -119,6 +120,26 @@ WaterwayShortcut CreateWaterwayShortcut(GameWorld& world, unsigned playerId, boo
     SetWaterwayTerrain(world, shortcut.source, shortcut.waterRoute);
     return shortcut;
 }
+
+struct ScopedRoadRouteBQPenalty
+{
+    explicit ScopedRoadRouteBQPenalty(double value)
+        : oldRoadRoute(AI_CONFIG.bqPenalty.roadRoute),
+          oldWeightedSearch(AI_CONFIG.bqPenalty.roadRouteWeightedSearch)
+    {
+        AI_CONFIG.bqPenalty.roadRoute = value;
+        AI_CONFIG.bqPenalty.roadRouteWeightedSearch = value > 0.0 && oldWeightedSearch;
+    }
+
+    ~ScopedRoadRouteBQPenalty()
+    {
+        AI_CONFIG.bqPenalty.roadRoute = oldRoadRoute;
+        AI_CONFIG.bqPenalty.roadRouteWeightedSearch = oldWeightedSearch;
+    }
+
+    double oldRoadRoute;
+    bool oldWeightedSearch;
+};
 } // namespace
 
 // Note game command execution is emulated to be like the ones send via network:
@@ -435,6 +456,13 @@ BOOST_FIXTURE_TEST_CASE(RoadWorkload_AccumulatesWareEdgesAndRefreshesDisabledPro
     AIJH::AIRoadWorkload workload(queries, world);
     workload.Refresh();
 
+    const std::vector<AIJH::RoadWorkloadSegment> hotSegments = workload.GetHotSegments(6);
+    BOOST_TEST_REQUIRE(!hotSegments.empty());
+    BOOST_TEST(hotSegments.front().workload == 7u);
+    BOOST_TEST(hotSegments.front().flag1 == producerFlag);
+    BOOST_TEST(hotSegments.front().flag2 == consumerFlag);
+    BOOST_TEST(workload.GetHotSegments(8).empty());
+
     BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 5u);
     BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::East)).value() == 7u);
     BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::SouthWest)).value() == 5u);
@@ -537,6 +565,54 @@ BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoad_StorehousePolicyBuildsLongerValidRo
     BOOST_TEST(ai.GetConstruction().BuildAlternativeRoad(sourceFlag, route, AIJH::AlternativeRoadPolicy::BuildFirstValid));
     BOOST_TEST(!route.empty());
     BOOST_TEST(ai.FetchGameCommands().size() == 1u);
+}
+
+BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoadBypassingSegment_BuildsShortcutAroundHotSegment, BiggerWorldWithGCExecution)
+{
+    ScopedRoadRouteBQPenalty disableRoadBQPenalty(0.0);
+    SetAllOwned(world);
+
+    const MapPoint sourceFlagPos = world.GetNeighbour(hqPos, Direction::SouthEast);
+    const std::vector<Direction> hotRoute{Direction::SouthEast, Direction::East, Direction::NorthEast,
+                                          Direction::SouthEast, Direction::East, Direction::NorthEast,
+                                          Direction::SouthEast, Direction::East, Direction::NorthEast};
+    const MapPoint targetFlagPos = GetRouteEnd(world, sourceFlagPos, hotRoute);
+    BOOST_TEST_REQUIRE(world.CalcDistance(sourceFlagPos, targetFlagPos) < hotRoute.size());
+
+    this->BuildRoad(sourceFlagPos, false, hotRoute);
+    const noFlag* sourceFlag = world.GetSpecObj<noFlag>(sourceFlagPos);
+    const noFlag* targetFlag = world.GetSpecObj<noFlag>(targetFlagPos);
+    BOOST_TEST_REQUIRE(sourceFlag);
+    BOOST_TEST_REQUIRE(targetFlag);
+
+    const RoadSegment* hotRoad = sourceFlag->GetRoute(hotRoute.front());
+    BOOST_TEST_REQUIRE(hotRoad);
+    BOOST_TEST(&hotRoad->GetOtherFlag(*sourceFlag) == targetFlag);
+
+    AIQueryService queries(world, curPlayer);
+    unsigned oldLength = 0;
+    std::vector<const RoadSegment*> traversedSegments;
+    BOOST_TEST_REQUIRE(queries.FindPathOnRoads(*sourceFlag, *targetFlag, &oldLength, &traversedSegments));
+    BOOST_TEST(oldLength == hotRoute.size());
+    BOOST_TEST(helpers::contains(traversedSegments, hotRoad));
+    std::vector<Direction> freeRoute;
+    unsigned freeLength = 0;
+    BOOST_TEST_REQUIRE(queries.FindFreePathForNewRoad(sourceFlagPos, targetFlagPos, &freeRoute, &freeLength));
+    BOOST_TEST(freeLength < oldLength);
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    const AIJH::RoadWorkloadSegment hotSegment{sourceFlagPos, targetFlagPos, 601u,
+                                               static_cast<unsigned>(hotRoute.size()), false};
+    std::vector<Direction> route;
+    BOOST_TEST_REQUIRE(ai.GetConstruction().BuildAlternativeRoadBypassingSegment(hotSegment, route));
+    BOOST_TEST(route.size() < hotRoute.size());
+    BOOST_TEST(route.front() != hotRoute.front());
+
+    auto commands = ai.FetchGameCommands();
+    BOOST_TEST_REQUIRE(commands.size() == 1u);
+    commands.front()->Execute(world, curPlayer);
+    BOOST_TEST_REQUIRE(sourceFlag->GetRoute(route.front()));
+    BOOST_TEST(sourceFlag->GetRoute(route.front()) != hotRoad);
 }
 
 BOOST_FIXTURE_TEST_CASE(BuildAlternativeWaterRoad_BuildsBeneficialWareShortcut, WaterwayWorldWithGCExecution)

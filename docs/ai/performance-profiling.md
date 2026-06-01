@@ -78,6 +78,7 @@ Defined in `AIRuntimeProfileSection` (`AIRuntimeProfiler.h`):
 | `TryToAttack` | Attack decision logic |
 | `TrySeaAttack` | Sea attack decision logic |
 | `CheckEconomicHotspots` | Expedition/forester/mine checks, every 1500 GF |
+| `CheckRoadWorkloadHotspots` | Hot road-workload bypass scan, every 2500 GF |
 | `UpdateTroopsLimit` | Troop limit recalculation, every 1000 GF |
 | `AdjustSettings` | Distribution/tool setting adjustments, every 150 GF |
 | `PlanNewBuildings` | Building placement planning |
@@ -118,9 +119,9 @@ Written to `STATS_CONFIG.statsPath/ai_performance.csv`, appended each time
 
 Section columns are emitted for: `RunGF`, `RefreshBuildingQualities`,
 `BuildingPlannerUpdate`, `ExecuteAIJob`, `EvaluateCaptureRisks`, `TryToAttack`,
-`TrySeaAttack`, `CheckEconomicHotspots`, `UpdateTroopsLimit`, `AdjustSettings`,
-`PlanNewBuildings`, `FindFreePathForNewRoad`,
-`FindWeightedFreePathForNewRoad`, and
+`TrySeaAttack`, `CheckEconomicHotspots`, `CheckRoadWorkloadHotspots`,
+`UpdateTroopsLimit`, `AdjustSettings`, `PlanNewBuildings`,
+`FindFreePathForNewRoad`, `FindWeightedFreePathForNewRoad`,
 `FindWeightedFreePathForNewRoadFallback`, and `CalculateRoadWorkload`.
 
 ### Reading the data
@@ -133,8 +134,9 @@ Section columns are emitted for: `RunGF`, `RefreshBuildingQualities`,
 - Road-route columns separate the broad unweighted search from the weighted
   refinement pass. A non-zero `FindWeightedFreePathForNewRoadFallback_Calls`
   count means a weighted request fell back to the unweighted pathfinder.
-- `CalculateRoadWorkload` runs once after AI startup and every staggered
-  `1500 GF`. Its shutdown-summary work units count attempted pair routes.
+- `CalculateRoadWorkload` runs once after AI startup, every staggered
+  `1500 GF`, and before the staggered `2500 GF` road-workload bypass scan. Its
+  shutdown-summary work units count attempted pair routes.
 - `ResourceValueCache_Hits` and `ResourceValueCache_Misses` are per-window
   deltas, not cumulative totals. Compare them with the global build and route
   sections to see whether search-heavy windows are benefiting from cache reuse.

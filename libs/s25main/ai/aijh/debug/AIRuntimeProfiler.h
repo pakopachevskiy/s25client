@@ -35,6 +35,7 @@ enum class AIRuntimeProfileSection : unsigned
     TryToAttack,
     TrySeaAttack,
     CheckEconomicHotspots,
+    CheckRoadWorkloadHotspots,
     UpdateTroopsLimit,
     AdjustSettings,
     PlanNewBuildings,

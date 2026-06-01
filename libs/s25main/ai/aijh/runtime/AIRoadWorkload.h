@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "ai/aijh/RoadWorkloadSegment.h"
 #include "gameTypes/MapCoordinates.h"
 
 #include <optional>
@@ -22,11 +23,14 @@ public:
 
     void Refresh();
     std::optional<unsigned> Get(MapPoint pt) const;
+    const std::vector<RoadWorkloadSegment>& GetSegments() const { return segments_; }
+    std::vector<RoadWorkloadSegment> GetHotSegments(unsigned minWorkload) const;
 
 private:
     const AIQueryService& queries_;
     const GameWorldBase& world_;
     std::vector<std::optional<unsigned>> nodeValues_;
+    std::vector<RoadWorkloadSegment> segments_;
 };
 
 } // namespace AIJH

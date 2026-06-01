@@ -49,6 +49,7 @@
     void CheckExpeditions();
     void CheckForester();
     void CheckGraniteMine();
+    void TryBuildRoadWorkloadBypass();
     void TryToAttack();
     const nobBaseMilitary* SelectAttackTarget(TargetSelectionMode mode) const;
     const nobBaseMilitary* SelectAttackTargetPrudent() const;

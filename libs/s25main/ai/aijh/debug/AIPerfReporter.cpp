@@ -23,7 +23,7 @@ struct CsvSection
     const char* name;
 };
 
-constexpr std::array<CsvSection, 15> kCsvSections = {{
+constexpr std::array<CsvSection, 16> kCsvSections = {{
   {AIJH::AIRuntimeProfileSection::RunGF, "RunGF"},
   {AIJH::AIRuntimeProfileSection::RefreshBuildingQualities, "RefreshBuildingQualities"},
   {AIJH::AIRuntimeProfileSection::BuildingPlannerUpdate, "BuildingPlannerUpdate"},
@@ -32,6 +32,7 @@ constexpr std::array<CsvSection, 15> kCsvSections = {{
   {AIJH::AIRuntimeProfileSection::TryToAttack, "TryToAttack"},
   {AIJH::AIRuntimeProfileSection::TrySeaAttack, "TrySeaAttack"},
   {AIJH::AIRuntimeProfileSection::CheckEconomicHotspots, "CheckEconomicHotspots"},
+  {AIJH::AIRuntimeProfileSection::CheckRoadWorkloadHotspots, "CheckRoadWorkloadHotspots"},
   {AIJH::AIRuntimeProfileSection::UpdateTroopsLimit, "UpdateTroopsLimit"},
   {AIJH::AIRuntimeProfileSection::AdjustSettings, "AdjustSettings"},
   {AIJH::AIRuntimeProfileSection::PlanNewBuildings, "PlanNewBuildings"},

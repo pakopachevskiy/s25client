@@ -74,6 +74,9 @@ public:
                                         bool allowFallback = true) const;
     bool FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr,
                          std::vector<const RoadSegment*>* traversedSegments = nullptr) const;
+    bool FindPathOnRoadsAvoidingSegment(const noRoadNode& start, const noRoadNode& target,
+                                        const RoadSegment& forbidden, unsigned* length = nullptr,
+                                        std::vector<const RoadSegment*>* traversedSegments = nullptr) const;
     bool FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr,
                                 std::vector<const RoadSegment*>* traversedSegments = nullptr) const;
     bool CanBuildCatapult() const;

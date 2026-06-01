@@ -64,6 +64,12 @@ public:
     {
         return queryService_.FindPathOnRoads(start, target, length, traversedSegments);
     }
+    bool FindPathOnRoadsAvoidingSegment(const noRoadNode& start, const noRoadNode& target,
+                                        const RoadSegment& forbidden, unsigned* length = nullptr,
+                                        std::vector<const RoadSegment*>* traversedSegments = nullptr) const
+    {
+        return queryService_.FindPathOnRoadsAvoidingSegment(start, target, forbidden, length, traversedSegments);
+    }
     bool FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr,
                                 std::vector<const RoadSegment*>* traversedSegments = nullptr) const
     {
