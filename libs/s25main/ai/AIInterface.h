@@ -59,13 +59,15 @@ public:
     {
         return queryService_.FindWeightedFreePathForNewRoad(start, target, bqPenalty, route, length, allowFallback);
     }
-    bool FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr) const
+    bool FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr,
+                         std::vector<const RoadSegment*>* traversedSegments = nullptr) const
     {
-        return queryService_.FindPathOnRoads(start, target, length);
+        return queryService_.FindPathOnRoads(start, target, length, traversedSegments);
     }
-    bool FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr) const
+    bool FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr,
+                                std::vector<const RoadSegment*>* traversedSegments = nullptr) const
     {
-        return queryService_.FindPathForWareOnRoads(start, target, length);
+        return queryService_.FindPathForWareOnRoads(start, target, length, traversedSegments);
     }
     bool CanBuildCatapult() const { return queryService_.CanBuildCatapult(); }
     bool CanBuildBuildingtype(BuildingType bt) const { return queryService_.CanBuildBuildingtype(bt); }
@@ -83,6 +85,7 @@ public:
     const std::list<nobMilitary*>& GetMilitaryBuildings() const { return queryService_.GetMilitaryBuildings(); }
     const std::list<nobHarborBuilding*>& GetHarbors() const { return queryService_.GetHarbors(); }
     const std::list<nobBaseWarehouse*>& GetStorehouses() const { return queryService_.GetStorehouses(); }
+    const std::list<RoadSegment*>& GetRoads() const { return queryService_.GetRoads(); }
     bool isBuildingNearby(BuildingType bldType, MapPoint pt, unsigned maxDistance) const
     {
         return queryService_.isBuildingNearby(bldType, pt, maxDistance);

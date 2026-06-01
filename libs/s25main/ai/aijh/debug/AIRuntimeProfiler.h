@@ -45,6 +45,7 @@ enum class AIRuntimeProfileSection : unsigned
     FindFreePathForNewRoad,
     FindWeightedFreePathForNewRoad,
     FindWeightedFreePathForNewRoadFallback,
+    CalculateRoadWorkload,
     Count
 };
 
@@ -94,6 +95,7 @@ class ScopedAIRuntimeProfile
 public:
     explicit ScopedAIRuntimeProfile(AIRuntimeProfileSection section, std::uint64_t workUnits = 0);
     ~ScopedAIRuntimeProfile();
+    void SetWorkUnits(std::uint64_t workUnits) { workUnits_ = workUnits; }
 
 private:
     AIRuntimeProfiler* profiler_;

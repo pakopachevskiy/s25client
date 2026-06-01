@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "GamePlayer.h"
+#include "ai/AIQueryService.h"
+#include "ai/aijh/runtime/AIRoadWorkload.h"
 #include "buildings/nobHarborBuilding.h"
 #include "factories/BuildingFactory.h"
 #include "worldFixtures/CreateEmptyWorld.h"
@@ -48,4 +50,18 @@ BOOST_FIXTURE_TEST_CASE(StartExpeditionThenDestroy, HarborFixture)
     world.DestroyBuilding(hb->GetPos(), 0);
     // Builder should be canceled
     BOOST_TEST_REQUIRE(hq->GetLeavingFigures().size() == numLeavingFigs);
+}
+
+BOOST_FIXTURE_TEST_CASE(RoadWorkloadIncludesExpeditionMaterials, HarborFixture)
+{
+    hq->Clear();
+    hb->Clear();
+    AIQueryService queries(world, 0);
+    AIJH::AIRoadWorkload workload(queries, world);
+    workload.Refresh();
+    BOOST_TEST(workload.Get(world.GetNeighbour(hq->GetFlagPos(), Direction::East)).value() == 0u);
+
+    hb->StartExpedition();
+    workload.Refresh();
+    BOOST_TEST(workload.Get(world.GetNeighbour(hq->GetFlagPos(), Direction::East)).value() == 2u);
 }

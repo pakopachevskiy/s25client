@@ -95,6 +95,7 @@ Defined in `AIRuntimeProfileSection` (`AIRuntimeProfiler.h`):
 | `FindFreePathForNewRoad` | Unweighted free-terrain road route search |
 | `FindWeightedFreePathForNewRoad` | Weighted road route search used for BQ-aware refinement |
 | `FindWeightedFreePathForNewRoadFallback` | Fallback from weighted route search to the unweighted route finder |
+| `CalculateRoadWorkload` | Cached road workload snapshot refresh; work units are attempted pair routes |
 
 ## `ai_performance.csv`
 
@@ -120,7 +121,7 @@ Section columns are emitted for: `RunGF`, `RefreshBuildingQualities`,
 `TrySeaAttack`, `CheckEconomicHotspots`, `UpdateTroopsLimit`, `AdjustSettings`,
 `PlanNewBuildings`, `FindFreePathForNewRoad`,
 `FindWeightedFreePathForNewRoad`, and
-`FindWeightedFreePathForNewRoadFallback`.
+`FindWeightedFreePathForNewRoadFallback`, and `CalculateRoadWorkload`.
 
 ### Reading the data
 
@@ -132,6 +133,8 @@ Section columns are emitted for: `RunGF`, `RefreshBuildingQualities`,
 - Road-route columns separate the broad unweighted search from the weighted
   refinement pass. A non-zero `FindWeightedFreePathForNewRoadFallback_Calls`
   count means a weighted request fell back to the unweighted pathfinder.
+- `CalculateRoadWorkload` runs once after AI startup and every staggered
+  `1500 GF`. Its shutdown-summary work units count attempted pair routes.
 - `ResourceValueCache_Hits` and `ResourceValueCache_Misses` are per-window
   deltas, not cumulative totals. Compare them with the global build and route
   sections to see whether search-heavy windows are benefiting from cache reuse.

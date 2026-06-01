@@ -18,6 +18,7 @@
 #include "ai/aijh/runtime/AIMapState.h"
 #include "ai/aijh/runtime/AIMilitaryLogistics.h"
 #include "ai/aijh/runtime/AIRoadController.h"
+#include "ai/aijh/runtime/AIRoadWorkload.h"
 #include "ai/aijh/runtime/AIWorldQueries.h"
 #include "addons/const_addons.h"
 #include "ai/AIEvents.h"
@@ -149,6 +150,7 @@ AIPlayerJH::AIPlayerJH(const unsigned char playerId, const GameWorldBase& gwb, c
       eventHandler_(std::make_unique<AIEventHandler>(*this)),
       militaryLogistics_(std::make_unique<AIMilitaryLogistics>(*this)),
       worldQueries_(std::make_unique<AIWorldQueries>(*this)),
+      roadWorkload_(std::make_unique<AIRoadWorkload>(aii.Queries(), gwb)),
       isInitGfCompleted(false), defeated(player.IsDefeated()),
       bldPlanner(std::make_unique<BuildingPlanner>(*this)),
       construction(std::make_unique<AIConstruction>(*this)),
@@ -252,6 +254,7 @@ void AIPlayerJH::RunGF(const unsigned gf, bool gfisnwf)
     {
         InitStoreAndMilitarylists();
         InitDistribution();
+        roadWorkload_->Refresh();
         isInitGfCompleted = 1;
     }
     if(isInitGfCompleted < 10)
@@ -315,6 +318,7 @@ void AIPlayerJH::RunGF(const unsigned gf, bool gfisnwf)
         CheckExpeditions();
         CheckForester();
         CheckGraniteMine();
+        roadWorkload_->Refresh();
     }
 
     if((gf + playerId * 19) % 1000 == 0)

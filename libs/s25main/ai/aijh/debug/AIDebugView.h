@@ -28,6 +28,7 @@ public:
     virtual int GetResourceValueForDebug(MapPoint pt, AIResource res) const = 0;
     virtual std::optional<int> GetPointRating(BuildingType type, MapPoint pt) const = 0;
     virtual unsigned GetNumBuildingsWanted(BuildingType type) const = 0;
+    virtual std::optional<unsigned> GetRoadWorkload(MapPoint pt) const = 0;
 };
 
 } // namespace AIJH

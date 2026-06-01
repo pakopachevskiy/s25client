@@ -4,6 +4,7 @@
 
 #include "GamePlayer.h"
 #include "PointOutput.h"
+#include "ai/AIQueryService.h"
 #include "buildings/noBuildingSite.h"
 #include "buildings/nobHarborBuilding.h"
 #include "buildings/nobShipYard.h"
@@ -64,6 +65,21 @@ BOOST_FIXTURE_TEST_CASE(HarborPlacing, SeaWorldWithGCExecution<>)
     const std::vector<Direction> road = FindRoadPath(world.GetNeighbour(hqPos, Direction::SouthEast),
                                                      world.GetNeighbour(hbPos, Direction::SouthEast), world);
     BOOST_TEST_REQUIRE(!road.empty());
+}
+
+BOOST_FIXTURE_TEST_CASE(WareRoadPath_OmitsShipHopsFromTraversedSegments, SeaWorldWithGCExecution<>)
+{
+    auto* source = dynamic_cast<nobHarborBuilding*>(BuildingFactory::CreateBuilding(
+      world, BuildingType::HarborBuilding, world.GetHarborPoint(1), curPlayer, Nation::Romans));
+    auto* target = dynamic_cast<nobHarborBuilding*>(BuildingFactory::CreateBuilding(
+      world, BuildingType::HarborBuilding, world.GetHarborPoint(3), curPlayer, Nation::Romans));
+    BOOST_TEST_REQUIRE(source);
+    BOOST_TEST_REQUIRE(target);
+
+    AIQueryService queries(world, curPlayer);
+    std::vector<const RoadSegment*> traversedSegments;
+    BOOST_TEST_REQUIRE(queries.FindPathForWareOnRoads(*source, *target, nullptr, &traversedSegments));
+    BOOST_TEST(traversedSegments.empty());
 }
 
 BOOST_FIXTURE_TEST_CASE(ShipBuilding, SeaWorldWithGCExecution<>)

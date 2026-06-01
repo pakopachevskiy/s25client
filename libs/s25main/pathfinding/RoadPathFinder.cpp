@@ -12,6 +12,7 @@
 #include "nodeObjs/noRoadNode.h"
 #include "gameData/GameConsts.h"
 #include "s25util/Log.h"
+#include <algorithm>
 
 /// Comparison operator for road nodes that returns true if lhs > rhs (descending order)
 struct RoadNodeComperatorGreater
@@ -106,8 +107,12 @@ template<class T_AdditionalCosts, class T_SegmentConstraints>
 bool RoadPathFinder::FindPathImpl(const noRoadNode& start, const noRoadNode& goal, const unsigned max,
                                   const T_AdditionalCosts addCosts, const T_SegmentConstraints isSegmentAllowed,
                                   unsigned* const length, RoadPathDirection* const firstDir,
-                                  MapPoint* const firstNodePos)
+                                  MapPoint* const firstNodePos,
+                                  std::vector<const RoadSegment*>* const traversedSegments)
 {
+    if(traversedSegments)
+        traversedSegments->clear();
+
     if(&start == &goal)
     {
         // Path where start==goal should never happen
@@ -180,6 +185,21 @@ bool RoadPathFinder::FindPathImpl(const noRoadNode& start, const noRoadNode& goa
 
                 if(firstNodePos)
                     *firstNodePos = firstNode->GetPos();
+            }
+
+            if(traversedSegments)
+            {
+                for(const noRoadNode* node = &best; node != &start; node = node->prev)
+                {
+                    RTTR_Assert(node->prev);
+                    if(node->dir_ != RoadPathDirection::Ship)
+                    {
+                        const RoadSegment* segment = node->prev->GetRoute(toDirection(node->dir_));
+                        RTTR_Assert(segment);
+                        traversedSegments->push_back(segment);
+                    }
+                }
+                std::reverse(traversedSegments->begin(), traversedSegments->end());
             }
 
             // Done, path found
@@ -293,29 +313,32 @@ bool RoadPathFinder::FindPathImpl(const noRoadNode& start, const noRoadNode& goa
 
 bool RoadPathFinder::FindPath(const noRoadNode& start, const noRoadNode& goal, const bool wareMode, const unsigned max,
                               const RoadSegment* const forbidden, unsigned* const length,
-                              RoadPathDirection* const firstDir, MapPoint* const firstNodePos)
+                              RoadPathDirection* const firstDir, MapPoint* const firstNodePos,
+                              std::vector<const RoadSegment*>* const traversedSegments)
 {
-    RTTR_Assert_Msg(length || firstDir || firstNodePos, "Use PathExists instead!");
+    RTTR_Assert_Msg(length || firstDir || firstNodePos || traversedSegments, "Use PathExists instead!");
 
     if(wareMode)
     {
         // TODO(Replay): Change to target flag instead of its attached building
         if(forbidden)
             return FindPathImpl(start, goal, max, AdditonalCosts::Carrier(),
-                                SegmentConstraints::AvoidSegment(forbidden), length, firstDir, firstNodePos);
+                                SegmentConstraints::AvoidSegment(forbidden), length, firstDir, firstNodePos,
+                                traversedSegments);
         else
             return FindPathImpl(start, goal, max, AdditonalCosts::Carrier(), SegmentConstraints::None(), length,
-                                firstDir, firstNodePos);
+                                firstDir, firstNodePos, traversedSegments);
     } else
     {
         if(forbidden)
             return FindPathImpl(start, goal, max, AdditonalCosts::None(),
                                 SegmentConstraints::And<SegmentConstraints::AvoidSegment,
                                                         SegmentConstraints::AvoidRoadType<RoadType::Water>>(forbidden),
-                                length, firstDir, firstNodePos);
+                                length, firstDir, firstNodePos, traversedSegments);
         else
             return FindPathImpl(start, goal, max, AdditonalCosts::None(),
-                                SegmentConstraints::AvoidRoadType<RoadType::Water>(), length, firstDir, firstNodePos);
+                                SegmentConstraints::AvoidRoadType<RoadType::Water>(), length, firstDir, firstNodePos,
+                                traversedSegments);
     }
 }
 

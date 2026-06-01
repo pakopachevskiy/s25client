@@ -6,6 +6,7 @@
 
 #include "ai/aijh/planning/BuildingPlanner.h"
 #include "ai/aijh/planning/GlobalPositionFinder.h"
+#include "ai/aijh/runtime/AIRoadWorkload.h"
 #include "ai/aijh/runtime/AIWorldQueries.h"
 
 namespace AIJH {
@@ -88,6 +89,11 @@ std::optional<int> AIPlayerJH::GetPointRating(const BuildingType type, const Map
 unsigned AIPlayerJH::GetNumBuildingsWanted(const BuildingType type) const
 {
     return bldPlanner->GetNumBuildingsWanted(type);
+}
+
+std::optional<unsigned> AIPlayerJH::GetRoadWorkload(const MapPoint pt) const
+{
+    return roadWorkload_->Get(pt);
 }
 
 } // namespace AIJH

@@ -4,9 +4,12 @@
 
 #include "PointOutput.h"
 #include "RttrForeachPt.h"
+#include "Ware.h"
 #include "ai/AIPlayer.h"
+#include "ai/AIQueryService.h"
 #include "ai/aijh/planning/AIConstruction.h"
 #include "ai/aijh/runtime/AIRoadController.h"
+#include "ai/aijh/runtime/AIRoadWorkload.h"
 #include "ai/aijh/runtime/AIPlayerJH.h"
 #include "buildings/noBuilding.h"
 #include "buildings/noBuildingSite.h"
@@ -15,6 +18,7 @@
 #include "buildings/nobShipYard.h"
 #include "factories/AIFactory.h"
 #include "factories/BuildingFactory.h"
+#include "figures/nofPassiveSoldier.h"
 #include "helpers/containerUtils.h"
 #include "network/GameMessage_Chat.h"
 #include "notifications/NodeNote.h"
@@ -347,6 +351,178 @@ BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoad_ShortcutPolicyRejectsLongerRoad, Wo
     std::vector<Direction> route;
     BOOST_TEST(!ai.GetConstruction().BuildAlternativeRoad(sourceFlag, route, AIJH::AlternativeRoadPolicy::ShortcutOnly));
     BOOST_TEST(ai.FetchGameCommands().empty());
+}
+
+BOOST_FIXTURE_TEST_CASE(WareRoadPath_ReturnsOrderedSegmentsAndClearsThemOnFailure, BiggerWorldWithGCExecution)
+{
+    SetAllOwned(world);
+    const MapPoint source = world.GetNeighbour(hqPos, Direction::SouthEast);
+    const std::vector<Direction> firstRoute(3, Direction::East);
+    const MapPoint middle = GetRouteEnd(world, source, firstRoute);
+    const std::vector<Direction> secondRoute(3, Direction::SouthEast);
+    const MapPoint target = GetRouteEnd(world, middle, secondRoute);
+    this->BuildRoad(source, false, firstRoute);
+    this->BuildRoad(middle, false, secondRoute);
+
+    const noFlag* sourceFlag = world.GetSpecObj<noFlag>(source);
+    const noFlag* middleFlag = world.GetSpecObj<noFlag>(middle);
+    const noFlag* targetFlag = world.GetSpecObj<noFlag>(target);
+    BOOST_TEST_REQUIRE(sourceFlag);
+    BOOST_TEST_REQUIRE(middleFlag);
+    BOOST_TEST_REQUIRE(targetFlag);
+
+    AIQueryService queries(world, curPlayer);
+    std::vector<const RoadSegment*> traversedSegments;
+    BOOST_TEST_REQUIRE(queries.FindPathForWareOnRoads(*sourceFlag, *targetFlag, nullptr, &traversedSegments));
+    const std::vector<const RoadSegment*> expectedSegments{sourceFlag->GetRoute(Direction::East),
+                                                           middleFlag->GetRoute(Direction::SouthEast)};
+    BOOST_TEST(traversedSegments == expectedSegments, boost::test_tools::per_element());
+
+    const MapPoint disconnected = world.MakeMapPoint(Position(source.x - 4, source.y - 4));
+    world.SetFlag(disconnected, curPlayer);
+    BOOST_TEST(!queries.FindPathForWareOnRoads(*sourceFlag, *world.GetSpecObj<noFlag>(disconnected), nullptr,
+                                               &traversedSegments));
+    BOOST_TEST(traversedSegments.empty());
+}
+
+BOOST_FIXTURE_TEST_CASE(WareRoadPath_ReturnsWaterwaySegments, WaterwayWorldWithGCExecution)
+{
+    const WaterwayShortcut shortcut = CreateWaterwayShortcut(world, curPlayer, false);
+    world.BuildRoad(curPlayer, true, shortcut.source, shortcut.waterRoute);
+    const noFlag* sourceFlag = world.GetSpecObj<noFlag>(shortcut.source);
+    const noFlag* targetFlag = world.GetSpecObj<noFlag>(shortcut.target);
+    BOOST_TEST_REQUIRE(sourceFlag);
+    BOOST_TEST_REQUIRE(targetFlag);
+
+    AIQueryService queries(world, curPlayer);
+    std::vector<const RoadSegment*> traversedSegments;
+    BOOST_TEST_REQUIRE(queries.FindPathForWareOnRoads(*sourceFlag, *targetFlag, nullptr, &traversedSegments));
+    BOOST_TEST_REQUIRE(traversedSegments.size() == 1u);
+    BOOST_TEST(traversedSegments.front() == sourceFlag->GetRoute(Direction::East));
+    BOOST_TEST(static_cast<int>(traversedSegments.front()->GetRoadType()) == static_cast<int>(RoadType::Water));
+}
+
+BOOST_FIXTURE_TEST_CASE(RoadWorkload_AccumulatesWareEdgesAndRefreshesDisabledProducer, BiggerWorldWithGCExecution)
+{
+    SetAllOwned(world);
+    const MapPoint hqFlag = world.GetNeighbour(hqPos, Direction::SouthEast);
+    const std::vector<Direction> producerRoute(4, Direction::East);
+    const MapPoint producerFlag = GetRouteEnd(world, hqFlag, producerRoute);
+    const std::vector<Direction> consumerRoute(4, Direction::East);
+    const MapPoint consumerFlag = GetRouteEnd(world, producerFlag, consumerRoute);
+    const std::vector<Direction> warehouseRoute(4, Direction::SouthWest);
+    const MapPoint warehouseFlag = GetRouteEnd(world, producerFlag, warehouseRoute);
+    const std::vector<Direction> unusedRoute(3, Direction::NorthEast);
+    const MapPoint unusedFlag = GetRouteEnd(world, producerFlag, unusedRoute);
+
+    this->BuildRoad(hqFlag, false, producerRoute);
+    this->BuildRoad(producerFlag, false, consumerRoute);
+    this->BuildRoad(producerFlag, false, warehouseRoute);
+    this->BuildRoad(producerFlag, false, unusedRoute);
+
+    auto* producer = dynamic_cast<nobUsual*>(BuildingFactory::CreateBuilding(
+      world, BuildingType::Sawmill, world.GetNeighbour(producerFlag, Direction::NorthWest), curPlayer, Nation::Romans));
+    BOOST_TEST_REQUIRE(producer);
+    auto* consumer = dynamic_cast<nobUsual*>(BuildingFactory::CreateBuilding(
+      world, BuildingType::Metalworks, world.GetNeighbour(consumerFlag, Direction::NorthWest), curPlayer,
+      Nation::Romans));
+    BOOST_TEST_REQUIRE(consumer);
+    BOOST_TEST_REQUIRE(BuildingFactory::CreateBuilding(
+      world, BuildingType::Storehouse, world.GetNeighbour(warehouseFlag, Direction::NorthWest), curPlayer,
+      Nation::Romans));
+
+    AIQueryService queries(world, curPlayer);
+    AIJH::AIRoadWorkload workload(queries, world);
+    workload.Refresh();
+
+    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 5u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::East)).value() == 7u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::SouthWest)).value() == 5u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::NorthEast)).value() == 0u);
+    BOOST_TEST(!workload.Get(producerFlag));
+    BOOST_TEST_REQUIRE(world.GetSpecObj<noFlag>(unusedFlag));
+
+    const MapPoint disconnectedFlag = world.MakeMapPoint(Position(hqFlag.x - 5, hqFlag.y - 5));
+    BuildingFactory::CreateBuilding(world, BuildingType::Metalworks,
+                                    world.GetNeighbour(disconnectedFlag, Direction::NorthWest), curPlayer,
+                                    Nation::Romans);
+    workload.Refresh();
+    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 5u);
+
+    std::vector<std::unique_ptr<Ware>> orderedBoards;
+    while(consumer->CalcDistributionPoints(GoodType::Boards) > 0)
+        orderedBoards.push_back(std::make_unique<Ware>(GoodType::Boards, consumer, queries.GetStorehouses().front()));
+    workload.Refresh();
+    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 4u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::East)).value() == 4u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::SouthWest)).value() == 4u);
+    for(const auto& ware : orderedBoards)
+    {
+        consumer->WareLost(*ware);
+        world.GetPlayer(curPlayer).RemoveWare(*ware);
+    }
+
+    producer->SetProductionEnabled(false);
+    workload.Refresh();
+    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 3u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::East)).value() == 6u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::SouthWest)).value() == 3u);
+}
+
+BOOST_FIXTURE_TEST_CASE(RoadWorkload_IncludesConstructionSiteMaterials, BiggerWorldWithGCExecution)
+{
+    SetAllOwned(world);
+    const MapPoint hqFlag = world.GetNeighbour(hqPos, Direction::SouthEast);
+    const std::vector<Direction> route(4, Direction::East);
+    const MapPoint siteFlag = GetRouteEnd(world, hqFlag, route);
+    this->BuildRoad(hqFlag, false, route);
+
+    const MapPoint sitePos = world.GetNeighbour(siteFlag, Direction::NorthWest);
+    world.GetPlayer(curPlayer).GetFirstWH()->Clear();
+    world.SetBuildingSite(BuildingType::Metalworks, sitePos, curPlayer);
+    BOOST_TEST_REQUIRE(world.GetSpecObj<noBuildingSite>(sitePos));
+
+    AIQueryService queries(world, curPlayer);
+    AIJH::AIRoadWorkload workload(queries, world);
+    workload.Refresh();
+    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 2u);
+}
+
+BOOST_FIXTURE_TEST_CASE(RoadWorkload_IncludesMilitaryCoinDemand, BiggerWorldWithGCExecution)
+{
+    SetAllOwned(world);
+    const MapPoint hqFlag = world.GetNeighbour(hqPos, Direction::SouthEast);
+    const std::vector<Direction> route(4, Direction::East);
+    const MapPoint militaryFlag = GetRouteEnd(world, hqFlag, route);
+    this->BuildRoad(hqFlag, false, route);
+
+    const MapPoint militaryPos = world.GetNeighbour(militaryFlag, Direction::NorthWest);
+    auto* military = dynamic_cast<nobMilitary*>(
+      BuildingFactory::CreateBuilding(world, BuildingType::Barracks, militaryPos, curPlayer, Nation::Romans));
+    BOOST_TEST_REQUIRE(military);
+    auto& soldier = world.AddFigure(
+      militaryPos, std::make_unique<nofPassiveSoldier>(militaryPos, curPlayer, military, military, 0));
+    world.GetPlayer(curPlayer).IncreaseInventoryJob(soldier.GetJobType(), 1);
+    soldier.WalkToGoal();
+    BOOST_TEST_REQUIRE(military->CalcCoinsPoints() > 0);
+
+    AIQueryService queries(world, curPlayer);
+    AIJH::AIRoadWorkload workload(queries, world);
+    workload.Refresh();
+    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 1u);
+}
+
+BOOST_FIXTURE_TEST_CASE(RoadWorkload_ExposesWaterwayTiles, WaterwayWorldWithGCExecution)
+{
+    const WaterwayShortcut shortcut = CreateWaterwayShortcut(world, curPlayer, false);
+    world.BuildRoad(curPlayer, true, shortcut.source, shortcut.waterRoute);
+
+    AIQueryService queries(world, curPlayer);
+    AIJH::AIRoadWorkload workload(queries, world);
+    workload.Refresh();
+    BOOST_TEST(workload.Get(world.GetNeighbour(shortcut.source, Direction::East)).value() == 0u);
+    BOOST_TEST(!workload.Get(shortcut.source));
+    BOOST_TEST(!workload.Get(shortcut.target));
 }
 
 BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoad_StorehousePolicyBuildsLongerValidRoad, WorldWithGCExecution<1>)

@@ -105,6 +105,8 @@ public:
     void RoadDestroyed();
     /// Remove (unoccupied) road from the list
     void DeleteRoad(RoadSegment* rs);
+    /// Return registered flag-to-flag roads owned by this player
+    const std::list<RoadSegment*>& GetRoads() const { return roads; }
     /// Returns true if the player has at least one waterway
     bool HasWaterRoads() const;
     /// Find a carrier for the road and, if needed, request one from the nearest warehouse

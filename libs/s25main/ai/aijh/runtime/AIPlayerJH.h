@@ -50,6 +50,7 @@ class AIEconomyController;
 class AIEventHandler;
 class AIMilitaryLogistics;
 class AIWorldQueries;
+class AIRoadWorkload;
 class AIStatsReporter;
 class AIPerfReporter;
 class AICombatController;
@@ -110,6 +111,7 @@ public:
     const Node& GetAINode(MapPoint pt) const;
     std::optional<int> GetPointRating(BuildingType type, MapPoint pt) const override;
     unsigned GetNumBuildingsWanted(BuildingType type) const override;
+    std::optional<unsigned> GetRoadWorkload(MapPoint pt) const override;
 
     unsigned GetNumPlannedConnectedInlandMilitaryBlds()
     {

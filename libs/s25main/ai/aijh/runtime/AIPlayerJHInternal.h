@@ -90,6 +90,7 @@
     std::unique_ptr<AIEventHandler> eventHandler_;
     std::unique_ptr<AIMilitaryLogistics> militaryLogistics_;
     std::unique_ptr<AIWorldQueries> worldQueries_;
+    std::unique_ptr<AIRoadWorkload> roadWorkload_;
 
     unsigned attack_interval;
     unsigned build_interval;

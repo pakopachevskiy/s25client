@@ -28,7 +28,7 @@ constexpr std::array<std::string_view, static_cast<unsigned>(AIRuntimeProfileSec
   "TryToAttack",              "TrySeaAttack",               "CheckEconomicHotspots",  "UpdateTroopsLimit",
   "AdjustSettings",           "PlanNewBuildings",           "UpdateTroopsLimitScan",  "UpdateTroopsLimitScore",
   "UpdateTroopsLimitDist",    "UpdateTroopsLimitApply",      "FindFreePathRoad",      "FindWeightedPathRoad",
-  "FindWeightedPathFallback"};
+  "FindWeightedPathFallback", "CalculateRoadWorkload"};
 
 double ToMilliseconds(const std::uint64_t nanoseconds) { return static_cast<double>(nanoseconds) / 1'000'000.0; }
 

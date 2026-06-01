@@ -72,8 +72,10 @@ public:
     bool FindWeightedFreePathForNewRoad(MapPoint start, MapPoint target, const BQPenaltyConfig& bqPenalty,
                                         std::vector<Direction>* route = nullptr, unsigned* length = nullptr,
                                         bool allowFallback = true) const;
-    bool FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr) const;
-    bool FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr) const;
+    bool FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr,
+                         std::vector<const RoadSegment*>* traversedSegments = nullptr) const;
+    bool FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length = nullptr,
+                                std::vector<const RoadSegment*>* traversedSegments = nullptr) const;
     bool CanBuildCatapult() const;
     bool CanBuildBuildingtype(BuildingType bt) const;
     bool IsPlayerAttackable(unsigned char playerID) const;
@@ -94,6 +96,7 @@ public:
     const std::list<nobMilitary*>& GetMilitaryBuildings() const;
     const std::list<nobHarborBuilding*>& GetHarbors() const;
     const std::list<nobBaseWarehouse*>& GetStorehouses() const;
+    const std::list<RoadSegment*>& GetRoads() const;
     bool isBuildingNearby(BuildingType bldType, MapPoint pt, unsigned maxDistance) const;
     bool isHarborPosClose(MapPoint pt, unsigned maxDistance, bool onlyEmpty = false) const;
     const Inventory& GetInventory() const;

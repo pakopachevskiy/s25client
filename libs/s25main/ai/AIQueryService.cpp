@@ -680,20 +680,22 @@ bool AIQueryService::FindWeightedFreePathForNewRoad(MapPoint start, MapPoint tar
     return FindFreePathForNewRoad(start, target, route, length);
 }
 
-bool AIQueryService::FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length) const
+bool AIQueryService::FindPathOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length,
+                                     std::vector<const RoadSegment*>* traversedSegments) const
 {
-    if(length)
+    if(length || traversedSegments)
         return gwb.GetRoadPathFinder().FindPath(start, target, false, std::numeric_limits<unsigned>::max(), nullptr,
-                                                length);
+                                                length, nullptr, nullptr, traversedSegments);
     else
         return gwb.GetRoadPathFinder().PathExists(start, target, false);
 }
 
-bool AIQueryService::FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length) const
+bool AIQueryService::FindPathForWareOnRoads(const noRoadNode& start, const noRoadNode& target, unsigned* length,
+                                            std::vector<const RoadSegment*>* traversedSegments) const
 {
-    if(length)
+    if(length || traversedSegments)
         return gwb.GetRoadPathFinder().FindPath(start, target, true, std::numeric_limits<unsigned>::max(), nullptr,
-                                                length);
+                                                length, nullptr, nullptr, traversedSegments);
     else
         return gwb.GetRoadPathFinder().PathExists(start, target, true);
 }
@@ -754,6 +756,11 @@ const std::list<nobHarborBuilding*>& AIQueryService::GetHarbors() const
 const std::list<nobBaseWarehouse*>& AIQueryService::GetStorehouses() const
 {
     return player_.GetBuildingRegister().GetStorehouses();
+}
+
+const std::list<RoadSegment*>& AIQueryService::GetRoads() const
+{
+    return player_.GetRoads();
 }
 
 bool AIQueryService::isBuildingNearby(BuildingType bldType, const MapPoint pt, unsigned maxDistance) const

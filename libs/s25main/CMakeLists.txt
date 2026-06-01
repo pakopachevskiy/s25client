@@ -63,6 +63,7 @@ set(s25Main_SRCS
         WareEventLogger.cpp
         ai/aijh/runtime/AIAdjuster.cpp
         ai/aijh/runtime/AIMapState.cpp
+        ai/aijh/runtime/AIRoadWorkload.cpp
         ai/aijh/runtime/AIWorldQueries.cpp
         ai/aijh/combat/TargetSelector.cpp
         ai/aijh/combat/TargetSelectorAttrition.cpp

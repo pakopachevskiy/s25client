@@ -7,6 +7,7 @@
 #include "gameTypes/MapCoordinates.h"
 #include "gameTypes/RoadPathDirection.h"
 #include <limits>
+#include <vector>
 
 class GameWorldBase;
 class noRoadNode;
@@ -31,9 +32,11 @@ public:
     /// @param length If != nullptr will receive the final costs
     /// @param firstDir If != nullptr will receive the first direction to travel
     /// @param firstNodePos If != nullptr will receive the position of the first node
+    /// @param traversedSegments If != nullptr will receive traversed road segments in travel order, excluding ship hops
     bool FindPath(const noRoadNode& start, const noRoadNode& goal, bool wareMode,
                   unsigned max = std::numeric_limits<unsigned>::max(), const RoadSegment* forbidden = nullptr,
-                  unsigned* length = nullptr, RoadPathDirection* firstDir = nullptr, MapPoint* firstNodePos = nullptr);
+                  unsigned* length = nullptr, RoadPathDirection* firstDir = nullptr, MapPoint* firstNodePos = nullptr,
+                  std::vector<const RoadSegment*>* traversedSegments = nullptr);
 
     /// Checks if there is ANY path from start to goal
     ///
@@ -47,5 +50,6 @@ private:
     template<class T_AdditionalCosts, class T_SegmentConstraints>
     bool FindPathImpl(const noRoadNode& start, const noRoadNode& goal, unsigned max, T_AdditionalCosts addCosts,
                       T_SegmentConstraints isSegmentAllowed, unsigned* length = nullptr,
-                      RoadPathDirection* firstDir = nullptr, MapPoint* firstNodePos = nullptr);
+                      RoadPathDirection* firstDir = nullptr, MapPoint* firstNodePos = nullptr,
+                      std::vector<const RoadSegment*>* traversedSegments = nullptr);
 };

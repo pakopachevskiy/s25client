@@ -41,6 +41,7 @@ enum
 constexpr unsigned OVERLAY_POSITION_RATING = 13;
 constexpr unsigned OVERLAY_BUILDINGS_WANTED = 14;
 constexpr unsigned OVERLAY_INVENTORY = 15;
+constexpr unsigned OVERLAY_ROAD_WORKLOAD = 16;
 constexpr unsigned BUILDINGS_WANTED_DISABLED = std::numeric_limits<unsigned>::max();
 
 std::vector<std::pair<std::string, BuildingType>> GetSortedBuildingTypes()
@@ -136,6 +137,12 @@ public:
             if(rating)
                 font.Draw(curPos, helpers::toString(*rating), FontStyle{}, COLOR_YELLOW);
         }
+        else if(overlay == OVERLAY_ROAD_WORKLOAD)
+        {
+            const std::optional<unsigned> workload = ai->GetRoadWorkload(pt);
+            if(workload)
+                font.Draw(curPos, helpers::toString(*workload), FontStyle{}, COLOR_YELLOW);
+        }
     }
 };
 
@@ -182,6 +189,7 @@ iwAIDebug::iwAIDebug(GameWorldView& gwv, const std::vector<const AIPlayer*>& ais
     overlays->AddString("Position rating");
     overlays->AddString("Buildings wanted");
     overlays->AddString("Inventory");
+    overlays->AddString("Road Workload");
 
     buildingType = AddComboBox(ID_CbBuildingType, DrawPoint(15, 90), Extent(250, 20), TextureColor::Grey, NormalFont,
                                100);
