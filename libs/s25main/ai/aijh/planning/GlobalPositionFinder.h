@@ -19,7 +19,7 @@ public:
     GlobalPositionFinder(AIPlanningContext& aijh);
 
     MapPoint FindBestPosition(BuildingType bt);
-    std::optional<int> GetPointRating(BuildingType type, const MapPoint& pt) const;
+    std::optional<double> GetPointRating(BuildingType type, const MapPoint& pt) const;
 
 private:
     bool CheckProximity(BuildingType type, const MapPoint& pt) const;

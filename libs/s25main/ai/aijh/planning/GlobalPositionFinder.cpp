@@ -75,10 +75,10 @@ bool MeetsPointResourceRequirements(const AIWorldView& aijh, const AIQueryServic
     return true;
 }
 
-int ComputeResourcePenalty(const AIWorldView& aijh, const AIQueryService& queries, const BuildingType type,
+double ComputeResourcePenalty(const AIWorldView& aijh, const AIQueryService& queries, const BuildingType type,
                            const MapPoint& pt)
 {
-    int totalPenalty = 0;
+    double totalPenalty = 0;
     const auto& penaltyParams = aijh.GetConfig().locationParams[type].resourcePenalty;
     for(const auto resource : helpers::enumRange<AIResource>())
     {
@@ -200,7 +200,7 @@ bool GlobalPositionFinder::ValidStoneinRange(const MapPoint pt) const
     return false;
 }
 
-std::optional<int> GlobalPositionFinder::GetPointRating(const BuildingType type, const MapPoint& pt) const
+std::optional<double> GlobalPositionFinder::GetPointRating(const BuildingType type, const MapPoint& pt) const
 {
     if(!CheckProximity(type, pt))
         return std::nullopt;
@@ -217,11 +217,12 @@ std::optional<int> GlobalPositionFinder::GetPointRating(const BuildingType type,
         default: break;
     }
 
+    double baseRating = 0;
     if(UseMinimalResourceOnlyForInexhaustibleMine(aijh, type))
-        return 1;
-
-    const int baseRating = ComputeResourceRating(aijh, queries, construction, type, pt);
-    const int resourcePenalty = ComputeResourcePenalty(aijh, queries, type, pt);
+        baseRating = 25.0;
+    else
+        baseRating = ComputeResourceRating(aijh, queries, construction, type, pt);
+    const double resourcePenalty = ComputeResourcePenalty(aijh, queries, type, pt);
     return baseRating - resourcePenalty;
 }
 
