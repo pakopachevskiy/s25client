@@ -10,6 +10,8 @@
 #include "gameTypes/MapCoordinates.h"
 #include <optional>
 
+class AIQueryService;
+
 namespace AIJH {
 class AIPlanningContext;
 
@@ -22,6 +24,7 @@ public:
     std::optional<double> GetPointRating(BuildingType type, const MapPoint& pt) const;
 
 private:
+    bool IsSuitableBuildingPosition(BuildingType type, const MapPoint& pt, const AIQueryService& queries) const;
     bool CheckProximity(BuildingType type, const MapPoint& pt) const;
     bool ValidFishInRange(MapPoint pt) const;
     bool ValidStoneinRange(MapPoint pt) const;

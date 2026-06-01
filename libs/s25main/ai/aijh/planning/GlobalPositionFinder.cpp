@@ -134,6 +134,37 @@ bool UseMinimalResourceOnlyForInexhaustibleMine(const AIWorldView& aijh, const B
 
 GlobalPositionFinder::GlobalPositionFinder(AIPlanningContext& aijh) : aijh(aijh) {}
 
+bool GlobalPositionFinder::IsSuitableBuildingPosition(const BuildingType type, const MapPoint& pt,
+                                                      const AIQueryService& queries) const
+{
+    if(!pt.isValid())
+        return false;
+
+    const Node& node = aijh.GetAINode(pt);
+    if(!node.reachable || !node.owned || node.farmed)
+        return false;
+
+    const BuildingQuality requiredSize = BUILDING_SIZE[type];
+    if(!canUseBq(node.bq, requiredSize))
+        return false;
+
+    const bool isMilitaryBuilding = BuildingProperties::IsMilitary(type);
+    if(!isMilitaryBuilding && queries.IsReservedMilitaryBorderSlot(pt, node.bq))
+        return false;
+    if(queries.isHarborPosClose(pt, 2, true) && requiredSize != BuildingQuality::Harbor)
+        return false;
+    if(IsBorderBlocked(aijh, queries, type, pt))
+        return false;
+    if(!MeetsPointResourceRequirements(aijh, queries, type, pt))
+        return false;
+    if(isMilitaryBuilding && aijh.GetWorld().IsOnRoad(aijh.GetWorld().GetNeighbour(pt, Direction::SouthEast)))
+        return false;
+    if(isMilitaryBuilding && aijh.GetWorld().IsMilitaryBuildingNearNode(pt, aijh.GetPlayerId()))
+        return false;
+
+    return true;
+}
+
 bool GlobalPositionFinder::CheckProximity(const BuildingType type, const MapPoint& pt) const
 {
     if(!pt.isValid())
@@ -202,10 +233,10 @@ bool GlobalPositionFinder::ValidStoneinRange(const MapPoint pt) const
 
 std::optional<double> GlobalPositionFinder::GetPointRating(const BuildingType type, const MapPoint& pt) const
 {
-    if(!CheckProximity(type, pt))
+    const AIQueryService& queries = aijh.GetInterface().Queries();
+    if(!IsSuitableBuildingPosition(type, pt, queries) || !CheckProximity(type, pt))
         return std::nullopt;
 
-    const AIQueryService& queries = aijh.GetInterface().Queries();
     AIConstruction& construction = aijh.GetConstruction();
 
     switch(type)
@@ -231,31 +262,10 @@ MapPoint GlobalPositionFinder::FindBestPosition(const BuildingType bt)
     aijh.RecordGlobalPositionSearchInvocation();
     int bestValue = 0;
     MapPoint bestPt = MapPoint::Invalid();
-    const AIQueryService& queries = aijh.GetInterface().Queries();
     const MapExtent mapSize = aijh.GetWorld().GetSize();
-    const BuildingQuality requiredSize = BUILDING_SIZE[bt];
-    const bool isMilitaryBuilding = BuildingProperties::IsMilitary(bt);
 
     RTTR_FOREACH_PT(MapPoint, mapSize)
     {
-        const Node& node = aijh.GetAINode(pt);
-        if(!node.reachable || !node.owned || node.farmed)
-            continue;
-        if(!canUseBq(node.bq, requiredSize))
-            continue;
-        if(!isMilitaryBuilding && queries.IsReservedMilitaryBorderSlot(pt, node.bq))
-            continue;
-        if(queries.isHarborPosClose(pt, 2, true) && requiredSize != BuildingQuality::Harbor)
-            continue;
-        if(IsBorderBlocked(aijh, queries, bt, pt))
-            continue;
-        if(!MeetsPointResourceRequirements(aijh, queries, bt, pt))
-            continue;
-        if(isMilitaryBuilding && aijh.GetWorld().IsOnRoad(aijh.GetWorld().GetNeighbour(pt, Direction::SouthEast)))
-            continue;
-        if(isMilitaryBuilding && aijh.GetWorld().IsMilitaryBuildingNearNode(pt, aijh.GetPlayerId()))
-            continue;
-
         const std::optional<int> pointRating = GetPointRating(bt, pt);
         if(!pointRating)
             continue;

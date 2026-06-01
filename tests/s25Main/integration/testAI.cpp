@@ -165,6 +165,21 @@ BOOST_FIXTURE_TEST_CASE(AIChat, EmptyWorldFixture2P)
     }
 }
 
+BOOST_FIXTURE_TEST_CASE(PointRating_IsUnavailableForUnsuitableNode, WorldWithGCExecution<1>)
+{
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    MapPoint ratedPt = MapPoint::Invalid();
+    RTTR_FOREACH_PT(MapPoint, world.GetSize())
+    {
+        if(!ratedPt.isValid() && ai.GetPointRating(BuildingType::Well, pt))
+            ratedPt = pt;
+    }
+    BOOST_TEST_REQUIRE(ratedPt.isValid());
+
+    ai.GetAINode(ratedPt).farmed = true;
+    BOOST_TEST(!ai.GetPointRating(BuildingType::Well, ratedPt));
+}
+
 BOOST_FIXTURE_TEST_CASE(KeepBQUpdated, BiggerWorldWithGCExecution)
 {
     // Place some trees to reduce BQ at some points
