@@ -12,7 +12,7 @@ class nobBaseWarehouse;
 class iwHQ : public iwBaseWarehouse
 {
 public:
-    iwHQ(GameWorldView& gwv, GameCommandFactory& gcFactory, nobBaseWarehouse* wh);
+    iwHQ(GameWorldView& gwv, GameCommandFactory& gcFactory, nobBaseWarehouse* wh, bool readOnly = false);
 
 protected:
     void Msg_Group_ButtonClick(unsigned group_id, unsigned ctrl_id) override;

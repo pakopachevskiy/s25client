@@ -13,7 +13,7 @@ class GameCommandFactory;
 class iwTempleBuilding : public iwBuilding
 {
 public:
-    iwTempleBuilding(GameWorldView& gwv, GameCommandFactory& gcFactory, nobUsual* building);
+    iwTempleBuilding(GameWorldView& gwv, GameCommandFactory& gcFactory, nobUsual* building, bool readOnly = false);
 
 private:
     void Msg_ButtonClick(unsigned ctrl_id) override;

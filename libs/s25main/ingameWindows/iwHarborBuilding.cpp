@@ -10,8 +10,9 @@
 #include "network/GameClient.h"
 #include "ogl/FontStyle.h"
 
-iwHarborBuilding::iwHarborBuilding(GameWorldView& gwv, GameCommandFactory& gcFactory, nobHarborBuilding* hb)
-    : iwHQ(gwv, gcFactory, hb)
+iwHarborBuilding::iwHarborBuilding(GameWorldView& gwv, GameCommandFactory& gcFactory, nobHarborBuilding* hb,
+                                   const bool readOnly)
+    : iwHQ(gwv, gcFactory, hb, readOnly)
 {
     SetTitle(_("Harbor building"));
 
@@ -24,7 +25,8 @@ iwHarborBuilding::iwHarborBuilding(GameWorldView& gwv, GameCommandFactory& gcFac
 
     // Button zum Expedition starten
     harbor_page.AddImageButton(1, DrawPoint(65, 100), Extent(30, 30), TextureColor::Grey, LOADER.GetImageN("io", 176),
-                               _("Start expedition"));
+                               _("Start expedition"))
+      ->SetEnabled(!readOnly);
     AdjustExpeditionButton(false);
 
     // "Expedition"-Überschrift
@@ -32,7 +34,8 @@ iwHarborBuilding::iwHarborBuilding(GameWorldView& gwv, GameCommandFactory& gcFac
 
     // Button zum Expedition starten
     harbor_page.AddImageButton(3, DrawPoint(65, 170), Extent(30, 30), TextureColor::Grey, LOADER.GetImageN("io", 176),
-                               _("Start exporation expedition"));
+                               _("Start exporation expedition"))
+      ->SetEnabled(!readOnly);
     AdjustExplorationExpeditionButton(false);
 }
 
@@ -94,6 +97,8 @@ void iwHarborBuilding::Msg_Group_ButtonClick(const unsigned group_id, const unsi
 {
     if(group_id == grpIdExpedition) // Hafengruppe?
     {
+        if(readOnly)
+            return;
         switch(ctrl_id)
         {
             case 1: // Expedition starten

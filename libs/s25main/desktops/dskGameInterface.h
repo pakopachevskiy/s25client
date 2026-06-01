@@ -102,6 +102,7 @@ public:
     /// Zeigt das Actionwindow an, bei Flaggen werden z.B. noch berücksichtigt, obs ne besondere Flagge ist usw
     void ShowActionWindow(const iwAction::Tabs& action_tabs, MapPoint cSel, const DrawPoint& mousePos,
                           bool enable_military_buildings);
+    void ShowBuildingWindow(MapPoint pt, bool readOnly);
 
     const GameWorldView& GetView() const { return gwv; }
 

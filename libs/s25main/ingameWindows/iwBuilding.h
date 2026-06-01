@@ -16,9 +16,12 @@ protected:
     GameWorldView& gwv;
     GameCommandFactory& gcFactory;
     nobUsual* const building; /// Das zugehörige Gebäudeobjekt
+    const bool readOnly;
 
 public:
-    iwBuilding(GameWorldView& gwv, GameCommandFactory& gcFactory, nobUsual* building, Extent extent = Extent(226, 194));
+    iwBuilding(GameWorldView& gwv, GameCommandFactory& gcFactory, nobUsual* building, bool readOnly = false,
+               Extent extent = Extent(226, 194));
+    bool IsReadOnly() const { return readOnly; }
 
 private:
     void Msg_PaintBefore() override;

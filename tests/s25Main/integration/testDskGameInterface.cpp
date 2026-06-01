@@ -3,13 +3,24 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "GamePlayer.h"
+#include "Loader.h"
 #include "PointOutput.h"
 #include "Settings.h"
 #include "WindowManager.h"
 #include "buildings/nobBaseWarehouse.h"
+#include "controls/ctrlButton.h"
+#include "controls/ctrlGroup.h"
+#include "controls/ctrlOptionGroup.h"
 #include "desktops/dskGameInterface.h"
 #include "driver/KeyEvent.h"
 #include "driver/MouseCoords.h"
+#include "factories/BuildingFactory.h"
+#include "ingameWindows/iwBaseWarehouse.h"
+#include "ingameWindows/iwBuilding.h"
+#include "ingameWindows/iwHQ.h"
+#include "ingameWindows/iwHarborBuilding.h"
+#include "ingameWindows/iwMilitaryBuilding.h"
+#include "ingameWindows/iwTempleBuilding.h"
 #include "mockupDrivers/MockupVideoDriver.h"
 #include "uiHelper/uiHelpers.hpp"
 #include "worldFixtures/CreateEmptyWorld.h"
@@ -48,6 +59,38 @@ struct GameInterfaceFixture : uiHelper::Fixture
           WINDOWMANAGER.Switch(std::make_unique<dskGameInterfaceMock>(worldFixture.game)));
         WINDOWMANAGER.Draw();
         view = &gameDesktop->GetView();
+    }
+};
+struct AiBuildingInspectionFixture : uiHelper::Fixture
+{
+    WorldFixture<CreateEmptyWorld, 2> worldFixture;
+    dskGameInterfaceMock* gameDesktop;
+
+    AiBuildingInspectionFixture()
+    {
+        LOADER.LoadDummyMapFiles();
+        worldFixture.world.GetPlayer(1).ps = PlayerState::AI;
+        gameDesktop = static_cast<dskGameInterfaceMock*>(
+          WINDOWMANAGER.Switch(std::make_unique<dskGameInterfaceMock>(worldFixture.game)));
+        WINDOWMANAGER.Draw();
+    }
+
+    template<class T>
+    T* OpenBuilding(MapPoint pt, bool readOnly = true)
+    {
+        worldFixture.world.SetVisibility(pt, 0, Visibility::Visible);
+        gameDesktop->ShowBuildingWindow(pt, readOnly);
+        auto* wnd = dynamic_cast<T*>(WINDOWMANAGER.GetTopMostWindow());
+        BOOST_TEST_REQUIRE(wnd);
+        return wnd;
+    }
+
+    void CloseTopWindow()
+    {
+        BOOST_TEST_REQUIRE(WINDOWMANAGER.GetTopMostWindow());
+        WINDOWMANAGER.GetTopMostWindow()->Close();
+        WINDOWMANAGER.Draw();
+        BOOST_TEST_REQUIRE(!WINDOWMANAGER.GetTopMostWindow());
     }
 };
 void checkNotScrolling(const GameWorldView& view, Cursor cursor = Cursor::Hand)
@@ -222,6 +265,106 @@ BOOST_FIXTURE_TEST_CASE(IwActionClose, GameInterfaceFixture)
     WINDOWMANAGER.Draw();
     BOOST_TEST_REQUIRE(WINDOWMANAGER.GetTopMostWindow() == nullptr);
     BOOST_TEST_REQUIRE(gameDesktop->actionwindow == nullptr);
+}
+
+BOOST_FIXTURE_TEST_CASE(AiBuildingInspectionWindowsAreReadOnly, AiBuildingInspectionFixture)
+{
+    GameWorld& world = worldFixture.world;
+    worldFixture.ggs.setSelection(AddonId::MILITARY_CONTROL, 2);
+
+    const MapPoint usualPos(22, 2);
+    BuildingFactory::CreateBuilding(world, BuildingType::Woodcutter, usualPos, 1, Nation::Romans);
+    auto* usual = OpenBuilding<iwBuilding>(usualPos);
+    BOOST_TEST(usual->GetCtrl<ctrlButton>(4)->GetEnabled());
+    BOOST_TEST(!usual->GetCtrl<ctrlButton>(5)->GetEnabled());
+    BOOST_TEST(!usual->GetCtrl<ctrlButton>(6)->GetEnabled());
+    BOOST_TEST(usual->GetCtrl<ctrlButton>(7)->GetEnabled());
+    BOOST_TEST(usual->GetCtrl<ctrlButton>(12)->GetEnabled());
+    CloseTopWindow();
+
+    const MapPoint templePos(24, 2);
+    BuildingFactory::CreateBuilding(world, BuildingType::Temple, templePos, 1, Nation::Romans);
+    auto* temple = OpenBuilding<iwTempleBuilding>(templePos);
+    BOOST_TEST(!temple->GetCtrl<ctrlButton>(8)->GetEnabled());
+    CloseTopWindow();
+
+    const MapPoint militaryPos(26, 2);
+    BuildingFactory::CreateBuilding(world, BuildingType::Guardhouse, militaryPos, 1, Nation::Romans);
+    auto* military = OpenBuilding<iwMilitaryBuilding>(militaryPos);
+    BOOST_TEST(military->GetCtrl<ctrlButton>(4)->GetEnabled());
+    BOOST_TEST(!military->GetCtrl<ctrlButton>(5)->GetEnabled());
+    BOOST_TEST(!military->GetCtrl<ctrlButton>(6)->GetEnabled());
+    BOOST_TEST(military->GetCtrl<ctrlButton>(7)->GetEnabled());
+    BOOST_TEST(military->GetCtrl<ctrlButton>(9)->GetEnabled());
+    BOOST_TEST(!military->GetCtrl<ctrlButton>(10)->GetEnabled());
+    BOOST_TEST(!military->GetCtrl<ctrlButton>(11)->GetEnabled());
+    BOOST_TEST(!military->GetCtrl<ctrlButton>(14)->GetEnabled());
+    CloseTopWindow();
+
+    const MapPoint storehousePos(28, 2);
+    BuildingFactory::CreateBuilding(world, BuildingType::Storehouse, storehousePos, 1, Nation::Romans);
+    auto* storehouse = OpenBuilding<iwBaseWarehouse>(storehousePos);
+    auto* settings = storehouse->GetCtrl<ctrlOptionGroup>(13);
+    BOOST_TEST(!settings->GetButton(14)->GetEnabled());
+    BOOST_TEST(!settings->GetButton(15)->GetEnabled());
+    BOOST_TEST(!settings->GetButton(16)->GetEnabled());
+    BOOST_TEST(!storehouse->GetCtrl<ctrlButton>(17)->GetEnabled());
+    BOOST_TEST(storehouse->GetCtrl<ctrlButton>(18)->GetEnabled());
+    BOOST_TEST(storehouse->GetCtrl<ctrlButton>(19)->GetEnabled());
+    BOOST_TEST(!storehouse->GetCtrl<ctrlButton>(20)->GetEnabled());
+    BOOST_TEST(!storehouse->GetCtrl<ctrlGroup>(100)->GetCtrl<ctrlButton>(100)->GetEnabled());
+    static_cast<Window*>(storehouse)->Msg_ButtonClick(0);
+    BOOST_TEST(!settings->GetButton(14)->GetEnabled());
+    BOOST_TEST(!settings->GetButton(15)->GetEnabled());
+    BOOST_TEST(!settings->GetButton(16)->GetEnabled());
+    BOOST_TEST(!storehouse->GetCtrl<ctrlButton>(17)->GetEnabled());
+    CloseTopWindow();
+
+    auto* hq = OpenBuilding<iwHQ>(world.GetPlayer(1).GetHQPos());
+    auto* reserve = hq->GetCtrl<ctrlGroup>(102);
+    BOOST_TEST(!reserve->GetCtrl<ctrlButton>(11)->GetEnabled());
+    BOOST_TEST(!reserve->GetCtrl<ctrlButton>(16)->GetEnabled());
+    CloseTopWindow();
+
+    const MapPoint harborPos(30, 2);
+    BuildingFactory::CreateBuilding(world, BuildingType::HarborBuilding, harborPos, 1, Nation::Romans);
+    auto* harbor = OpenBuilding<iwHarborBuilding>(harborPos);
+    auto* expedition = harbor->GetCtrl<ctrlGroup>(103);
+    BOOST_TEST(!expedition->GetCtrl<ctrlButton>(1)->GetEnabled());
+    BOOST_TEST(!expedition->GetCtrl<ctrlButton>(3)->GetEnabled());
+    CloseTopWindow();
+}
+
+BOOST_FIXTURE_TEST_CASE(LocalBuildingInspectionRemainsEditable, AiBuildingInspectionFixture)
+{
+    const MapPoint usualPos(22, 2);
+    BuildingFactory::CreateBuilding(worldFixture.world, BuildingType::Woodcutter, usualPos, 0, Nation::Romans);
+    OpenBuilding<iwBuilding>(usualPos);
+    gameDesktop->ShowBuildingWindow(usualPos, false);
+    auto* usual = OpenBuilding<iwBuilding>(usualPos, false);
+    BOOST_TEST(usual->GetCtrl<ctrlButton>(5)->GetEnabled());
+    BOOST_TEST(usual->GetCtrl<ctrlButton>(6)->GetEnabled());
+}
+
+BOOST_FIXTURE_TEST_CASE(AiBuildingNavigationSkipsHiddenBuildings, AiBuildingInspectionFixture)
+{
+    GameWorld& world = worldFixture.world;
+    const MapPoint firstPos(22, 2);
+    const MapPoint hiddenPos(24, 2);
+    const MapPoint visiblePos(26, 2);
+    BuildingFactory::CreateBuilding(world, BuildingType::Woodcutter, firstPos, 1, Nation::Romans);
+    BuildingFactory::CreateBuilding(world, BuildingType::Woodcutter, hiddenPos, 1, Nation::Romans);
+    BuildingFactory::CreateBuilding(world, BuildingType::Woodcutter, visiblePos, 1, Nation::Romans);
+    world.SetVisibility(firstPos, 0, Visibility::Visible);
+    world.SetVisibility(hiddenPos, 0, Visibility::FogOfWar);
+    world.SetVisibility(visiblePos, 0, Visibility::Visible);
+
+    auto* usual = OpenBuilding<iwBuilding>(firstPos);
+    static_cast<Window*>(usual)->Msg_ButtonClick(12);
+    auto* next = dynamic_cast<iwBuilding*>(WINDOWMANAGER.GetTopMostWindow());
+    BOOST_TEST_REQUIRE(next);
+    BOOST_TEST(next->GetID() == CGI_BUILDING + MapBase::CreateGUIID(visiblePos));
+    BOOST_TEST(!next->GetCtrl<ctrlButton>(5)->GetEnabled());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

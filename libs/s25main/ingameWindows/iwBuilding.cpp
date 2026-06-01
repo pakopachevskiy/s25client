@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "iwBuilding.h"
+#include "BuildingWindowHelpers.h"
 #include "GamePlayer.h"
 #include "Loader.h"
 #include "WindowManager.h"
@@ -25,25 +26,26 @@
 #include "gameData/const_gui_ids.h"
 #include <sstream>
 
-/// IDs in der IO_DAT von Boot und Schiffs-Bild für den Umschaltebutton beim Schiffsbauer
+/// IDs in IO_DAT for the boat and ship images used by the shipyard toggle button
 const unsigned IODAT_BOAT_ID = 219;
 const unsigned IODAT_SHIP_ID = 218;
 
-iwBuilding::iwBuilding(GameWorldView& gwv, GameCommandFactory& gcFactory, nobUsual* const building, Extent extent)
+iwBuilding::iwBuilding(GameWorldView& gwv, GameCommandFactory& gcFactory, nobUsual* const building, const bool readOnly,
+                       Extent extent)
     : IngameWindow(CGI_BUILDING + MapBase::CreateGUIID(building->GetPos()), IngameWindow::posAtMouse, extent,
                    _(BUILDING_NAMES[building->GetBuildingType()]), LOADER.GetImageN("resource", 41)),
-      gwv(gwv), gcFactory(gcFactory), building(building)
+      gwv(gwv), gcFactory(gcFactory), building(building), readOnly(readOnly)
 {
-    // Arbeitersymbol
+    // Worker icon
     AddImage(0, DrawPoint(28, 39), LOADER.GetMapTexture(2298));
 
     if(const auto job = BLD_WORK_DESC[building->GetBuildingType()].job)
         AddImage(13, DrawPoint(28, 39), LOADER.GetJobTex(*job));
 
-    // Gebäudesymbol
+    // Building icon
     AddImage(1, DrawPoint(117, 114), &building->GetBuildingImage());
 
-    // Symbol der produzierten Ware (falls hier was produziert wird)
+    // Icon for the produced ware (if anything is produced here)
     const auto producedWare = BLD_WORK_DESC[building->GetBuildingType()].producedWare;
     if(producedWare && producedWare != GoodType::Nothing)
     {
@@ -54,30 +56,33 @@ iwBuilding::iwBuilding(GameWorldView& gwv, GameCommandFactory& gcFactory, nobUsu
     // Info
     AddImageButton(4, DrawPoint(16, extent.y - 47), Extent(30, 32), TextureColor::Grey, LOADER.GetImageN("io", 225),
                    _("Help"));
-    // Abreißen
+    // Demolish
     AddImageButton(5, DrawPoint(50, extent.y - 47), Extent(34, 32), TextureColor::Grey, LOADER.GetImageN("io", 23),
-                   _("Demolish house"));
-    // Produktivität einstellen (196,197) (bei Spähturm ausblenden)
-    Window* enable_productivity = AddImageButton(
+                   _("Demolish house"))
+      ->SetEnabled(!readOnly);
+    // Toggle productivity (196, 197) (hide for lookout towers)
+    auto* enable_productivity = AddImageButton(
       6, DrawPoint(90, extent.y - 47), Extent(34, 32), TextureColor::Grey,
       LOADER.GetImageN("io", ((building->IsProductionDisabledVirtual()) ? 197 : 196)), _("Production on/off"));
     if(building->GetBuildingType() == BuildingType::LookoutTower)
         enable_productivity->SetVisible(false);
-    // Bei Bootsbauer Button zum Umwählen von Booten und Schiffen
+    enable_productivity->SetEnabled(!readOnly);
+    // Add a button to toggle between boats and ships for shipyards
     if(building->GetBuildingType() == BuildingType::Shipyard)
     {
-        // Jenachdem Boot oder Schiff anzeigen
+        // Display either a boat or a ship depending on the mode
         unsigned io_dat_id =
           (static_cast<nobShipYard*>(building)->GetMode() == nobShipYard::Mode::Boats) ? IODAT_BOAT_ID : IODAT_SHIP_ID;
         AddImageButton(11, DrawPoint(130, extent.y - 47), Extent(43, 32), TextureColor::Grey,
-                       LOADER.GetImageN("io", io_dat_id));
+                       LOADER.GetImageN("io", io_dat_id))
+          ->SetEnabled(!readOnly);
     }
 
-    // "Gehe Zum Ort"
+    // "Go to place"
     AddImageButton(7, DrawPoint(179, extent.y - 47), Extent(30, 32), TextureColor::Grey, LOADER.GetImageN("io", 107),
                    _("Go to place"));
 
-    // Produktivitätsanzeige (bei Katapulten und Spähtürmen ausblenden)
+    // Productivity display (hide for catapults and lookout towers)
     Window* productivity = AddPercent(9, DrawPoint(59, 31), Extent(106, 16), TextureColor::Grey, 0xFFFFFF00, SmallFont,
                                       building->GetProductivityPointer());
     if(building->GetBuildingType() == BuildingType::Catapult
@@ -95,7 +100,7 @@ void iwBuilding::Msg_PaintBefore()
 {
     IngameWindow::Msg_PaintBefore();
 
-    // Haus unbesetzt ggf ausblenden
+    // Hide the unoccupied-house message if necessary
     GetCtrl<ctrlText>(10)->SetVisible(!building->HasWorker());
 }
 
@@ -105,9 +110,9 @@ void iwBuilding::Msg_PaintAfter()
     const auto& bldWorkDesk = BLD_WORK_DESC[building->GetBuildingType()];
     if(BuildingProperties::IsMine(building->GetBuildingType()))
     {
-        // Bei Bergwerken sieht die Nahrungsanzeige ein wenig anders aus (3x 2)
+        // The food display for mines looks slightly different (3x2)
 
-        // "Schwarzer Rahmen"
+        // "Black border"
         DrawRectangle(Rect(GetDrawPos() + DrawPoint(40, 60), Extent(144, 24)), 0x80000000);
         DrawPoint curPos = GetDrawPos() + DrawPoint(52, 72);
         for(unsigned char i = 0; i < bldWorkDesk.waresNeeded.size(); ++i)
@@ -126,7 +131,7 @@ void iwBuilding::Msg_PaintAfter()
         {
             const unsigned wares_count = bldWorkDesk.numSpacesPerWare;
 
-            // "Schwarzer Rahmen"
+            // "Black border"
             DrawPoint waresPos = curPos - DrawPoint(24 * wares_count / 2, 0);
             DrawRectangle(Rect(waresPos, Extent(24 * wares_count, 24)), 0x80000000);
             waresPos += DrawPoint(12, 12);
@@ -150,29 +155,33 @@ void iwBuilding::Msg_ButtonClick(const unsigned ctrl_id)
 {
     switch(ctrl_id)
     {
-        case 4: // Hilfe
+        case 4: // Help
         {
             WINDOWMANAGER.ReplaceWindow(
               std::make_unique<iwHelp>(_(BUILDING_HELP_STRINGS[building->GetBuildingType()])));
         }
         break;
-        case 5: // Gebäude abbrennen
+        case 5: // Burn down building
         {
-            // Abreißen?
+            if(readOnly)
+                return;
+            // Demolish?
             Close();
             WINDOWMANAGER.Show(std::make_unique<iwDemolishBuilding>(gwv, building));
         }
         break;
         case 6:
         {
-            // Produktion einstellen/fortführen
-            // NC senden
+            if(readOnly)
+                return;
+            // Stop/resume production
+            // Send NC
             if(gcFactory.SetProductionEnabled(building->GetPos(), building->IsProductionDisabledVirtual()))
             {
-                // visuell anzeigen, falls erfolgreich
+                // Update the display if successful
                 building->ToggleProductionVirtual();
 
-                // anderes Bild auf dem Button
+                // Use a different image for the button
                 if(building->IsProductionDisabledVirtual())
                     GetCtrl<ctrlImageButton>(6)->SetImage(LOADER.GetImageN("io", 197));
                 else
@@ -186,17 +195,19 @@ void iwBuilding::Msg_ButtonClick(const unsigned ctrl_id)
             }
         }
         break;
-        case 7: // "Gehe Zum Ort"
+        case 7: // "Go to place"
         {
             gwv.MoveToMapPt(building->GetPos());
         }
         break;
-        case 11: // Schiff/Boot umstellen bei Schiffsbauer
+        case 11: // Toggle ship/boat mode for shipyards
         {
+            if(readOnly)
+                return;
             if(gcFactory.SetShipYardMode(building->GetPos(), static_cast<const nobShipYard*>(building)->GetMode()
                                                                == nobShipYard::Mode::Boats))
             {
-                // Auch optisch den Button umstellen
+                // Update the button image as well
                 auto* button = GetCtrl<ctrlImageButton>(11);
                 if(button->GetImage() == LOADER.GetImageN("io", IODAT_BOAT_ID))
                     button->SetImage(LOADER.GetImageN("io", IODAT_SHIP_ID));
@@ -212,22 +223,17 @@ void iwBuilding::Msg_ButtonClick(const unsigned ctrl_id)
                                                       .GetBuildingRegister()
                                                       .GetBuildings(building->GetBuildingType());
             // go through list once we get to current building -> open window for the next one and go to next location
-            auto it = helpers::find_if(
-              buildings, [bldPos = building->GetPos()](const auto* it) { return it->GetPos() == bldPos; });
-            if(it != buildings.end()) // got to current building in the list?
+            const auto it = building_window_helpers::GetNextBuilding(gwv, buildings, building, readOnly);
+            if(it != buildings.end())
             {
-                // close old window, open new window (todo: only open if it isnt already open), move to location of next
-                // building
                 Close();
-                ++it;
-                if(it == buildings.end()) // was last entry in list -> goto first
-                    it = buildings.begin();
                 gwv.MoveToMapPt((*it)->GetPos());
                 if(building->GetBuildingType() == BuildingType::Temple)
-                    WINDOWMANAGER.ReplaceWindow(std::make_unique<iwTempleBuilding>(gwv, gcFactory, *it))
+                    WINDOWMANAGER.ReplaceWindow(std::make_unique<iwTempleBuilding>(gwv, gcFactory, *it, readOnly))
                       .SetPos(GetPos());
                 else
-                    WINDOWMANAGER.ReplaceWindow(std::make_unique<iwBuilding>(gwv, gcFactory, *it)).SetPos(GetPos());
+                    WINDOWMANAGER.ReplaceWindow(std::make_unique<iwBuilding>(gwv, gcFactory, *it, readOnly))
+                      .SetPos(GetPos());
                 break;
             }
         }

@@ -19,10 +19,12 @@ class iwBaseWarehouse : public iwWares, public IDataChangedListener
 
 protected:
     nobBaseWarehouse* wh; /// Pointer zum entsprechenden Lagerhaus
+    const bool readOnly;
 
 public:
-    iwBaseWarehouse(GameWorldView& gwv, GameCommandFactory& gcFactory, nobBaseWarehouse* wh);
+    iwBaseWarehouse(GameWorldView& gwv, GameCommandFactory& gcFactory, nobBaseWarehouse* wh, bool readOnly = false);
     ~iwBaseWarehouse() override;
+    bool IsReadOnly() const { return readOnly; }
 
     void OnChange(unsigned changeId) override;
 
