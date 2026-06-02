@@ -456,16 +456,14 @@ BOOST_FIXTURE_TEST_CASE(RoadWorkload_AccumulatesWareEdgesAndRefreshesDisabledPro
     AIJH::AIRoadWorkload workload(queries, world);
     workload.Refresh();
 
-    const std::vector<AIJH::RoadWorkloadSegment> hotSegments = workload.GetHotSegments(6);
+    const std::vector<AIJH::RoadWorkloadSegment> hotSegments = workload.GetHotSegments(3);
     BOOST_TEST_REQUIRE(!hotSegments.empty());
-    BOOST_TEST(hotSegments.front().workload == 7u);
-    BOOST_TEST(hotSegments.front().flag1 == producerFlag);
-    BOOST_TEST(hotSegments.front().flag2 == consumerFlag);
-    BOOST_TEST(workload.GetHotSegments(8).empty());
+    BOOST_TEST(hotSegments.front().workload == 3u);
+    BOOST_TEST(workload.GetHotSegments(4).empty());
 
-    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 5u);
-    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::East)).value() == 7u);
-    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::SouthWest)).value() == 5u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 3u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::East)).value() == 3u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::SouthWest)).value() == 0u);
     BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::NorthEast)).value() == 0u);
     BOOST_TEST(!workload.Get(producerFlag));
     BOOST_TEST_REQUIRE(world.GetSpecObj<noFlag>(unusedFlag));
@@ -475,15 +473,15 @@ BOOST_FIXTURE_TEST_CASE(RoadWorkload_AccumulatesWareEdgesAndRefreshesDisabledPro
                                     world.GetNeighbour(disconnectedFlag, Direction::NorthWest), curPlayer,
                                     Nation::Romans);
     workload.Refresh();
-    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 5u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 3u);
 
     std::vector<std::unique_ptr<Ware>> orderedBoards;
     while(consumer->CalcDistributionPoints(GoodType::Boards) > 0)
         orderedBoards.push_back(std::make_unique<Ware>(GoodType::Boards, consumer, queries.GetStorehouses().front()));
     workload.Refresh();
-    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 4u);
-    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::East)).value() == 4u);
-    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::SouthWest)).value() == 4u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 3u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::East)).value() == 1u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::SouthWest)).value() == 0u);
     for(const auto& ware : orderedBoards)
     {
         consumer->WareLost(*ware);
@@ -492,28 +490,39 @@ BOOST_FIXTURE_TEST_CASE(RoadWorkload_AccumulatesWareEdgesAndRefreshesDisabledPro
 
     producer->SetProductionEnabled(false);
     workload.Refresh();
-    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 3u);
-    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::East)).value() == 6u);
-    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::SouthWest)).value() == 3u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 2u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::East)).value() == 2u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::SouthWest)).value() == 0u);
 }
 
 BOOST_FIXTURE_TEST_CASE(RoadWorkload_IncludesConstructionSiteMaterials, BiggerWorldWithGCExecution)
 {
     SetAllOwned(world);
     const MapPoint hqFlag = world.GetNeighbour(hqPos, Direction::SouthEast);
-    const std::vector<Direction> route(4, Direction::East);
-    const MapPoint siteFlag = GetRouteEnd(world, hqFlag, route);
-    this->BuildRoad(hqFlag, false, route);
+    const std::vector<Direction> producerRoute(4, Direction::East);
+    const MapPoint producerFlag = GetRouteEnd(world, hqFlag, producerRoute);
+    const std::vector<Direction> siteRoute(4, Direction::East);
+    const MapPoint siteFlag = GetRouteEnd(world, producerFlag, siteRoute);
+    this->BuildRoad(hqFlag, false, producerRoute);
+    this->BuildRoad(producerFlag, false, siteRoute);
 
+    auto* producer = dynamic_cast<nobUsual*>(BuildingFactory::CreateBuilding(
+      world, BuildingType::Sawmill, world.GetNeighbour(producerFlag, Direction::NorthWest), curPlayer,
+      Nation::Romans));
+    BOOST_TEST_REQUIRE(producer);
     const MapPoint sitePos = world.GetNeighbour(siteFlag, Direction::NorthWest);
     world.GetPlayer(curPlayer).GetFirstWH()->Clear();
     world.SetBuildingSite(BuildingType::Metalworks, sitePos, curPlayer);
-    BOOST_TEST_REQUIRE(world.GetSpecObj<noBuildingSite>(sitePos));
+    noBuildingSite* site = world.GetSpecObj<noBuildingSite>(sitePos);
+    BOOST_TEST_REQUIRE(site);
+    site->PlaningFinished();
+    BOOST_TEST_REQUIRE(site->CalcDistributionPoints(GoodType::Boards) > 0u);
 
     AIQueryService queries(world, curPlayer);
     AIJH::AIRoadWorkload workload(queries, world);
     workload.Refresh();
-    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 2u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(hqFlag, Direction::East)).value() == 0u);
+    BOOST_TEST(workload.Get(world.GetNeighbour(producerFlag, Direction::East)).value() == 1u);
 }
 
 BOOST_FIXTURE_TEST_CASE(RoadWorkload_IncludesMilitaryCoinDemand, BiggerWorldWithGCExecution)
@@ -533,6 +542,9 @@ BOOST_FIXTURE_TEST_CASE(RoadWorkload_IncludesMilitaryCoinDemand, BiggerWorldWith
     world.GetPlayer(curPlayer).IncreaseInventoryJob(soldier.GetJobType(), 1);
     soldier.WalkToGoal();
     BOOST_TEST_REQUIRE(military->CalcCoinsPoints() > 0);
+    Inventory goods;
+    goods.Add(GoodType::Coins);
+    world.GetPlayer(curPlayer).GetFirstWH()->AddGoods(goods, true);
 
     AIQueryService queries(world, curPlayer);
     AIJH::AIRoadWorkload workload(queries, world);

@@ -4,9 +4,12 @@
 
 #include "AIRoadWorkload.h"
 
+#include "FindWhConditions.h"
+#include "GamePlayer.h"
 #include "RoadSegment.h"
 #include "ai/AIQueryService.h"
 #include "ai/aijh/debug/AIRuntimeProfiler.h"
+#include "buildings/noBaseBuilding.h"
 #include "buildings/noBuildingSite.h"
 #include "buildings/nobBaseWarehouse.h"
 #include "buildings/nobHarborBuilding.h"
@@ -14,6 +17,7 @@
 #include "buildings/nobUsual.h"
 #include "gameData/BuildingConsts.h"
 #include "gameData/BuildingProperties.h"
+#include "nodeObjs/noFlag.h"
 #include "helpers/EnumRange.h"
 #include "world/GameWorldBase.h"
 
@@ -29,7 +33,7 @@ namespace {
 
 struct WareEdge
 {
-    const noRoadNode* node;
+    const noBaseBuilding* node;
     GoodType good;
 };
 
@@ -47,6 +51,9 @@ void AIRoadWorkload::Refresh()
     std::unordered_map<const RoadSegment*, unsigned> segmentScores;
     for(const RoadSegment* road : queries_.GetRoads())
         segmentScores.emplace(road, 0);
+
+    const GamePlayer& player = world_.GetPlayer(queries_.GetPlayerId());
+    GamePlayer::DistributionGoalSelections selectedGoals = player.GetDistributionGoalSelections();
 
     std::vector<WareEdge> producers;
     std::vector<WareEdge> consumers;
@@ -112,20 +119,40 @@ void AIRoadWorkload::Refresh()
         }
     };
 
+    const auto addPredictedDispatch = [&](const noRoadNode& start, const GoodType good) {
+        const noBaseBuilding* goal = player.PreviewClientForWare(good, start, selectedGoals);
+        if(goal)
+            addRoute(start, *goal);
+    };
+
     for(const WareEdge& producer : producers)
-    {
-        for(const WareEdge& consumer : consumers)
-        {
-            if(producer.good == consumer.good)
-                addRoute(*producer.node, *consumer.node);
-        }
-        for(const nobBaseWarehouse* warehouse : queries_.GetStorehouses())
-            addRoute(*producer.node, *warehouse);
-    }
+        addPredictedDispatch(*producer.node, producer.good);
 
     for(const nobBaseWarehouse* warehouse : queries_.GetStorehouses())
     {
-        for(const WareEdge& consumer : consumers)
+        const noFlag* flag = warehouse->GetFlag();
+        if(flag && flag->HasSpaceForWare())
+        {
+            for(const GoodType good : helpers::EnumRange<GoodType>{})
+            {
+                if(warehouse->GetNumRealWares(good) > 0
+                   && warehouse->GetInventorySetting(good).IsSet(EInventorySetting::Send))
+                    addPredictedDispatch(*warehouse, good);
+            }
+        }
+    }
+
+    for(const WareEdge& consumer : consumers)
+    {
+        if(player.hasEmergency() && (consumer.good == GoodType::Boards || consumer.good == GoodType::Stones)
+           && consumer.node->GetBuildingType() != BuildingType::Woodcutter
+           && consumer.node->GetBuildingType() != BuildingType::Sawmill)
+            continue;
+
+        const bool useBoatRoads = consumer.good != GoodType::Coins;
+        const nobBaseWarehouse* warehouse =
+          queries_.FindWarehouse(*consumer.node, FW::HasMinWares(consumer.good), false, useBoatRoads);
+        if(warehouse)
             addRoute(*warehouse, *consumer.node);
     }
 

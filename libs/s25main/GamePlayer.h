@@ -78,6 +78,7 @@ public:
         /// Index into goals: Preferred building
         unsigned selected_goal;
     };
+    using DistributionGoalSelections = helpers::EnumArray<unsigned, GoodType>;
 
     GamePlayer(unsigned playerId, const PlayerInfo& playerInfo, GameWorld& world);
     ~GamePlayer();
@@ -154,7 +155,12 @@ public:
     /// Finds a recipient for a (newly produced) ware (if none exists, a warehouse is searched;
     /// if no path exists there either, 0 is returned)
     noBaseBuilding* FindClientForWare(const Ware& ware);
+    /// Read-only variant of FindClientForWare for diagnostics and planning. The caller owns the distribution cursors.
+    noBaseBuilding* PreviewClientForWare(GoodType ware, const noRoadNode& start,
+                                         DistributionGoalSelections& selectedGoals) const;
+    DistributionGoalSelections GetDistributionGoalSelections() const;
     nobBaseWarehouse* FindWarehouseForWare(const Ware& ware) const;
+    nobBaseWarehouse* FindWarehouseForWare(GoodType ware, const noRoadNode& start) const;
 
     /// Finds a recipient (i.e. military building); if none is found, returns a warehouse or 0
     nobBaseMilitary* FindClientForCoin(const Ware& ware) const;
@@ -375,6 +381,10 @@ private:
     MapPoint hqPos;
 
     helpers::EnumArray<Distribution, GoodType> distribution;
+
+    noBaseBuilding* FindClientForWareImpl(GoodType ware, const noRoadNode& start,
+                                          DistributionGoalSelections& selectedGoals) const;
+    nobBaseMilitary* FindClientForCoin(const noRoadNode& start) const;
 
     /// Build-order mode (false = order by creation time, otherwise use build_order)
     bool useCustomBuildOrder_;

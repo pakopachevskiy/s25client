@@ -321,24 +321,27 @@ which production building or construction site receives the next ware.
 ## Road workload debug overlay
 
 The JH AI maintains a read-only road workload snapshot for diagnostics. It
-estimates pressure on each owned flag-to-flag road segment by routing eligible
-ware-flow edges with the normal ware-mode road pathfinder. That includes
-carrier congestion penalties, land roads, donkey roads, waterways, and road
-portions on either side of ship connections. Ship hops themselves have no
-segment score.
+estimates pressure on each owned flag-to-flag road segment by routing
+predicted current ware dispatches with the normal ware-mode road pathfinder.
+That includes carrier congestion penalties, land roads, donkey roads,
+waterways, and road portions on either side of ship connections. Ship hops
+themselves have no segment score.
 
 The model contributes one point for each routed edge:
 
-1. compatible enabled producer to currently eligible consumer
-2. enabled producer to every completed warehouse
-3. every completed warehouse to currently eligible consumer
+1. enabled producer to the destination `FindClientForWare()` would currently
+   choose for its produced ware
+2. stocked warehouse ware with `Send` enabled to the destination
+   `FindClientForWare()` would currently choose
+3. stocked warehouse to a consumer that can currently pull that ware
 
-Headquarters, storehouses, and harbors are stable warehouse hubs regardless of
-their current inventory or inventory settings. Consumers include ordinary
+Producer and warehouse-export destination previews use local distribution
+cursors, so the snapshot follows weighted distribution priorities without
+advancing the player's real distribution state. Consumers include ordinary
 buildings with positive distribution points, construction sites and active
 expeditions missing boards or stones, and military buildings with positive
-coin demand. Disabled producers, full consumers, disconnected pairs, and
-same-endpoint pairs do not contribute.
+coin demand. Empty warehouses, disabled producers, full consumers,
+disconnected pairs, and same-endpoint pairs do not contribute.
 
 The snapshot initializes every owned registered road segment to `0`, then
 expands each score onto the non-flag interior tiles of that segment. Endpoint
@@ -349,7 +352,8 @@ including zero. Selecting the overlay does not recalculate it.
 The AI refreshes the snapshot once after startup initialization and then in
 the player-staggered `1500 GF` economic-maintenance cadence. The values are
 diagnostic snapshots and can therefore remain stale for up to `1500 GF`;
-road-building decisions do not consume them.
+global road-workload bypass decisions refresh and consume the segment list on
+their own slower cadence.
 
 ## Route Failures And Lost Wares
 

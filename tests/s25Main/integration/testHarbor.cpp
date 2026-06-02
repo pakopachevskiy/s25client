@@ -63,5 +63,12 @@ BOOST_FIXTURE_TEST_CASE(RoadWorkloadIncludesExpeditionMaterials, HarborFixture)
 
     hb->StartExpedition();
     workload.Refresh();
+    BOOST_TEST(workload.Get(world.GetNeighbour(hq->GetFlagPos(), Direction::East)).value() == 0u);
+
+    Inventory goods;
+    goods.Add(GoodType::Boards);
+    goods.Add(GoodType::Stones);
+    hq->AddGoods(goods, true);
+    workload.Refresh();
     BOOST_TEST(workload.Get(world.GetNeighbour(hq->GetFlagPos(), Direction::East)).value() == 2u);
 }

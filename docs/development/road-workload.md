@@ -12,29 +12,33 @@ shortcut roads around hot segments. It is not a measurement of actual carrier
 throughput, queue length, or delivered ware count.
 
 Each score is attached to an owned flag-to-flag `RoadSegment`. A score is the
-number of eligible ware-flow edges whose current ware-mode route crosses that
-segment. Every eligible edge contributes exactly `1`, regardless of ware
-quantity, production rate, building productivity, or consumer priority value.
+number of predicted current ware-dispatch routes whose ware-mode path crosses
+that segment. Every predicted route contributes exactly `1`, regardless of
+ware quantity, production rate, or building productivity.
 
 Selecting the overlay does not change AI behavior; it only renders the latest
 cached values.
 
 ## Ware-Flow Model
 
-The calculator models three classes of potential ware flow:
+The calculator models three classes of actual-like ware flow:
 
 ```text
-compatible enabled producer -> eligible consumer
-enabled producer            -> every completed warehouse
-every completed warehouse   -> eligible consumer
+enabled producer                 -> previewed destination for its produced ware
+stocked warehouse Send export    -> previewed destination for that ware
+stocked warehouse with the ware  -> eligible consumer that can pull it
 ```
 
-The first class models direct supply. The warehouse classes treat storage
-buildings as stable logistics hubs, so a road remains visible as potentially
-important even when the warehouse is temporarily empty.
+Producer and warehouse-export destinations are selected with the same scoring
+rules used by `GamePlayer::FindClientForWare()`, but through a read-only
+preview path. That preview uses local distribution cursors, so the snapshot can
+model weighted distribution advancement without changing gameplay state.
 
-Headquarters, storehouses, and harbor buildings are warehouses for this model.
-Current warehouse stock and inventory settings do not affect hub eligibility.
+Warehouse-to-consumer routes model pull orders. A warehouse contributes only
+when it currently has the requested ware and is reachable by the same search
+direction used by the real order path. Warehouse inventory settings affect
+producer fallback and `Send` exports; empty warehouses are not treated as stable
+traffic hubs.
 
 ### Producers
 
@@ -51,9 +55,9 @@ snapshot refresh.
 
 A completed usual building contributes one consumer edge for each required
 ware whose `CalcDistributionPoints(good)` value is greater than `0`. A full
-consumer buffer therefore removes that edge on the next refresh. The numeric
-distribution priority is used only as an eligibility test; it does not weight
-the workload score.
+consumer buffer therefore removes that edge on the next refresh. Distribution
+priority, selected consumer type, local demand score, and road distance are
+applied when previewing where newly produced or exported wares would go.
 
 Temporary consumers are included as well:
 
@@ -63,7 +67,8 @@ Temporary consumers are included as well:
   than `0`
 
 Each material type is a separate edge. For example, a construction site
-missing both boards and stones contributes two warehouse-to-consumer routes.
+missing both boards and stones can contribute two warehouse-to-consumer routes,
+but only when reachable warehouse stock exists for both materials.
 
 ## Route Calculation
 
@@ -71,7 +76,7 @@ missing both boards and stones contributes two warehouse-to-consumer routes.
 road segment with score `0`. This ensures that unused roads remain visible in
 the overlay.
 
-For each modeled edge, the calculator skips same-endpoint pairs and calls:
+For each predicted route, the calculator skips same-endpoint endpoints and calls:
 
 ```cpp
 queries_.FindPathForWareOnRoads(start, goal, nullptr, &route)
@@ -91,7 +96,7 @@ start-to-goal order. Ship transitions are omitted because they do not
 correspond to a road segment. Road portions before and after a ship hop remain
 in the returned route and receive workload scores.
 
-Disconnected pairs do not contribute. Each segment in a successful routed
+Disconnected route attempts do not contribute. Each segment in a successful routed
 edge is incremented once. The calculator only scores registered owned
 flag-to-flag roads; building attachment sections are not rendered as workload
 roads.
@@ -151,9 +156,9 @@ intentional: this is a low-frequency diagnostic snapshot, not live transport
 telemetry.
 
 Refresh cost is recorded in the `CalculateRoadWorkload` runtime-profiler
-section. Its work-unit value is the number of attempted pair routes after
-same-endpoint pairs have been skipped. Disconnected attempts count as work
-units even though they do not add a score.
+section. Its work-unit value is the number of route attempts after same-endpoint
+endpoints have been skipped. Disconnected attempts count as work units even
+though they do not add a score.
 
 ## AI Bypass Use
 
@@ -201,23 +206,22 @@ Consider a shared road section used by:
 
 ```text
 sawmill -> metalworks
-sawmill -> headquarters
 headquarters -> metalworks
 ```
 
-If the sawmill is enabled and the metalworks still accepts boards, each route
-adds `1` to every owned flag-to-flag segment it crosses. A shared segment
-crossed by all three routes displays `3`. If the metalworks board buffer
-becomes full, the consumer edge disappears at the next refresh and the shared
-segment displays `1` for the remaining producer-to-warehouse route.
+If the sawmill is enabled and the metalworks still accepts boards, the
+producer preview adds one sawmill-to-metalworks route. If the headquarters has
+boards and the metalworks can pull them, the warehouse pull adds another route.
+A shared segment crossed by both routes displays `2`. If the metalworks board
+buffer becomes full, both routes disappear at the next refresh unless another
+consumer or warehouse fallback is selected.
 
 ## Practical Trace
 
 The important files are:
 
-- `libs/s25main/ai/aijh/runtime/AIRoadWorkload.*`: builds eligible edges,
-  calculates routes, stores segment scores, and expands segment values onto
-  tiles
+- `libs/s25main/ai/aijh/runtime/AIRoadWorkload.*`: builds predicted dispatch
+  routes, stores segment scores, and expands segment values onto tiles
 - `libs/s25main/pathfinding/RoadPathFinder.*`: optionally returns traversed
   road segments while omitting ship hops
 - `libs/s25main/ai/AIQueryService.*`: exposes ware-mode road path queries and

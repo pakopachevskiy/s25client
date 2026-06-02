@@ -1016,19 +1016,42 @@ struct ClientForWare
 
 noBaseBuilding* GamePlayer::FindClientForWare(const Ware& ware)
 {
+    DistributionGoalSelections selectedGoals = GetDistributionGoalSelections();
+    noBaseBuilding* result = FindClientForWareImpl(ware.type, *ware.GetLocation(), selectedGoals);
+    for(const GoodType good : helpers::EnumRange<GoodType>{})
+        distribution[good].selected_goal = selectedGoals[good];
+    return result;
+}
+
+noBaseBuilding* GamePlayer::PreviewClientForWare(const GoodType ware, const noRoadNode& start,
+                                                 DistributionGoalSelections& selectedGoals) const
+{
+    return FindClientForWareImpl(ware, start, selectedGoals);
+}
+
+GamePlayer::DistributionGoalSelections GamePlayer::GetDistributionGoalSelections() const
+{
+    DistributionGoalSelections result;
+    for(const GoodType good : helpers::EnumRange<GoodType>{})
+        result[good] = distribution[good].selected_goal;
+    return result;
+}
+
+noBaseBuilding* GamePlayer::FindClientForWareImpl(const GoodType ware, const noRoadNode& start,
+                                                  DistributionGoalSelections& selectedGoals) const
+{
     // If it is a gold coin, the target is calculated in a different way
-    if(ware.type == GoodType::Coins)
-        return FindClientForCoin(ware);
+    if(ware == GoodType::Coins)
+        return FindClientForCoin(start);
 
     // Determine ware type
-    GoodType gt = ware.type;
+    GoodType gt = ware;
     // All food is considered fish in the distribution table
-    Distribution& wareDistribution =
+    const GoodType distributionWare = (gt == GoodType::Bread || gt == GoodType::Meat) ? GoodType::Fish : gt;
+    const Distribution& wareDistribution =
       (gt == GoodType::Bread || gt == GoodType::Meat) ? distribution[GoodType::Fish] : distribution[gt];
 
     std::vector<ClientForWare> possibleClients;
-
-    const noRoadNode* start = ware.GetLocation();
 
     // Boards and stones may also be needed by harbors for expeditions
     if(gt == GoodType::Stones || gt == GoodType::Boards)
@@ -1040,7 +1063,7 @@ noBaseBuilding* GamePlayer::FindClientForWare(const Ware& ware)
                 continue;
 
             points += 10 * 30; // Distribution does not exist, but expeditions have high priority
-            unsigned distance = world.CalcDistance(start->GetPos(), harbor->GetPos()) / 2;
+            unsigned distance = world.CalcDistance(start.GetPos(), harbor->GetPos()) / 2;
             possibleClients.push_back(ClientForWare(harbor, points > distance ? points - distance : 0, points));
         }
     }
@@ -1058,7 +1081,7 @@ noBaseBuilding* GamePlayer::FindClientForWare(const Ware& ware)
                     continue;
 
                 points += wareDistribution.percent_buildings[BuildingType::Headquarters] * 30;
-                unsigned distance = world.CalcDistance(start->GetPos(), bldSite->GetPos()) / 2;
+                unsigned distance = world.CalcDistance(start.GetPos(), bldSite->GetPos()) / 2;
                 possibleClients.push_back(ClientForWare(bldSite, points > distance ? points - distance : 0, points));
             }
         } else
@@ -1073,7 +1096,7 @@ noBaseBuilding* GamePlayer::FindClientForWare(const Ware& ware)
                 if(!wareDistribution.goals.empty())
                 {
                     if(bld->GetBuildingType()
-                       == static_cast<BuildingType>(wareDistribution.goals[wareDistribution.selected_goal]))
+                       == static_cast<BuildingType>(wareDistribution.goals[selectedGoals[distributionWare]]))
                         points += 300;
                     else if(points >= 300) // avoid overflows (async!)
                         points -= 300;
@@ -1081,7 +1104,7 @@ noBaseBuilding* GamePlayer::FindClientForWare(const Ware& ware)
                         points = 0;
                 }
 
-                unsigned distance = world.CalcDistance(start->GetPos(), bld->GetPos()) / 2;
+                unsigned distance = world.CalcDistance(start.GetPos(), bld->GetPos()) / 2;
                 possibleClients.push_back(ClientForWare(bld, points > distance ? points - distance : 0, points));
             }
         }
@@ -1115,7 +1138,7 @@ noBaseBuilding* GamePlayer::FindClientForWare(const Ware& ware)
         // Find path ONLY if it may be better. Pathfinding is limited to the worst path score that would lead to a
         // better score. This eliminates the worst case scenario where all nodes in a split road network would be hit by
         // the pathfinding only to conclude that there is no possible path.
-        if(world.FindPathForWareOnRoads(*start, *possibleClient.bld, &path_length, nullptr,
+        if(world.FindPathForWareOnRoads(start, *possibleClient.bld, &path_length, nullptr,
                                         (possibleClient.points - best_points) * 2 - 1)
            != RoadPathDirection::None)
         {
@@ -1132,34 +1155,44 @@ noBaseBuilding* GamePlayer::FindClientForWare(const Ware& ware)
     }
 
     if(bestBld && !wareDistribution.goals.empty())
-        wareDistribution.selected_goal =
-          (wareDistribution.selected_goal + 907) % unsigned(wareDistribution.goals.size());
+        selectedGoals[distributionWare] =
+          (selectedGoals[distributionWare] + 907) % unsigned(wareDistribution.goals.size());
 
     // If no consumer was found, it has to go to a warehouse
     if(!bestBld)
-        bestBld = FindWarehouseForWare(ware);
+        bestBld = FindWarehouseForWare(ware, start);
 
     return bestBld;
 }
 
 nobBaseWarehouse* GamePlayer::FindWarehouseForWare(const Ware& ware) const
 {
+    return FindWarehouseForWare(ware.type, *ware.GetLocation());
+}
+
+nobBaseWarehouse* GamePlayer::FindWarehouseForWare(const GoodType ware, const noRoadNode& start) const
+{
     // Check whs that collect this ware
-    nobBaseWarehouse* wh = FindWarehouse(*ware.GetLocation(), FW::CollectsWare(ware.type), true, true);
+    nobBaseWarehouse* wh = FindWarehouse(start, FW::CollectsWare(ware), true, true);
     // If there is none, check those that accept it
     if(!wh)
     {
         // First find the ones, that do not send it right away (IMPORTANT: This avoids sending a ware to the wh that is
         // sending the ware out)
-        wh = FindWarehouse(*ware.GetLocation(), FW::AcceptsWareButNoSend(ware.type), true, true);
+        wh = FindWarehouse(start, FW::AcceptsWareButNoSend(ware), true, true);
         // The others only if this fails
         if(!wh)
-            wh = FindWarehouse(*ware.GetLocation(), FW::AcceptsWare(ware.type), true, true);
+            wh = FindWarehouse(start, FW::AcceptsWare(ware), true, true);
     }
     return wh;
 }
 
 nobBaseMilitary* GamePlayer::FindClientForCoin(const Ware& ware) const
+{
+    return FindClientForCoin(*ware.GetLocation());
+}
+
+nobBaseMilitary* GamePlayer::FindClientForCoin(const noRoadNode& start) const
 {
     nobBaseMilitary* bb = nullptr;
     unsigned best_points = 0, points;
@@ -1174,7 +1207,7 @@ nobBaseMilitary* GamePlayer::FindClientForCoin(const Ware& ware) const
         if(points)
         {
             // Calculate the path points to the building
-            if(world.FindPathForWareOnRoads(*ware.GetLocation(), *milBld, &way_points) != RoadPathDirection::None)
+            if(world.FindPathForWareOnRoads(start, *milBld, &way_points) != RoadPathDirection::None)
             {
                 // Subtract the path points from the score
                 points -= way_points;
@@ -1190,7 +1223,7 @@ nobBaseMilitary* GamePlayer::FindClientForCoin(const Ware& ware) const
 
     // If no consumer was found, it has to go to a warehouse
     if(!bb)
-        bb = FindWarehouseForWare(ware);
+        bb = FindWarehouseForWare(GoodType::Coins, start);
 
     return bb;
 }
