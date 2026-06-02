@@ -19,6 +19,7 @@
 #include "helpers/OptionalEnum.h"
 
 #include <list>
+#include <map>
 #include <memory>
 #include <optional>
 #include <queue>

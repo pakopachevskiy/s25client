@@ -613,7 +613,7 @@ BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoadBypassingSegment_BuildsShortcutAroun
     BOOST_TEST(freeLength < oldLength);
 
     AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
-    const AIJH::RoadWorkloadSegment hotSegment{sourceFlagPos, targetFlagPos, 601u,
+    const AIJH::RoadWorkloadSegment hotSegment{sourceFlagPos, targetFlagPos, 41u,
                                                static_cast<unsigned>(hotRoute.size()), false};
     std::vector<Direction> route;
     BOOST_TEST_REQUIRE(ai.GetConstruction().BuildAlternativeRoadBypassingSegment(hotSegment, route));

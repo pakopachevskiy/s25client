@@ -106,8 +106,29 @@
     std::unique_ptr<AICombatController> combatController_;
     std::unique_ptr<AIRoadController> roadController_;
 
+    struct RoadWorkloadBypassSegmentKey
+    {
+        MapPoint flag1;
+        MapPoint flag2;
+    };
+
+    struct RoadWorkloadBypassSegmentKeyLess
+    {
+        bool operator()(const RoadWorkloadBypassSegmentKey& lhs, const RoadWorkloadBypassSegmentKey& rhs) const
+        {
+            const MapPointLess less;
+            if(less(lhs.flag1, rhs.flag1))
+                return true;
+            if(less(rhs.flag1, lhs.flag1))
+                return false;
+            return less(lhs.flag2, rhs.flag2);
+        }
+    };
+
     Subscription subBuilding, subExpedition, subResource, subRoad, subShip, subProduction, subBQ,
         subBorderlandInvalidate;
     unsigned currentGF_ = 0;
+    std::map<RoadWorkloadBypassSegmentKey, unsigned, RoadWorkloadBypassSegmentKeyLess>
+      roadWorkloadBypassRetryAfterGF_;
     uint64_t globalPositionSearchInvocations_ = 0;
     uint64_t globalPositionSearchCooldownSkips_ = 0;

@@ -266,9 +266,9 @@ connectivity, flag-placement, and road-buildability checks.
 The AI also has a low-frequency global activation for road segments that the
 workload model considers hot. Every `2500 GF`, staggered by player id, it
 refreshes `AIRoadWorkload` and inspects the highest-scoring land road segments
-whose workload is at least `600`.
+whose workload is greater than `40`.
 
-For each inspected hot segment, the bypass search:
+For the highest eligible hot segment, the bypass search:
 
 - looks at owned flags near each endpoint, including the endpoint flags
   themselves,
@@ -285,9 +285,11 @@ For each inspected hot segment, the bypass search:
 - skips the pair if an existing path that avoids the hot segment is already no
   longer than the proposed new road.
 
-Only one best bypass is built per activation. Unlike the building-local
-secondary road pass, this trigger is not tied to a newly completed building;
-the hot workload segment chooses the area of interest.
+Only one bypass segment is attempted per activation. If the search cannot build
+a bypass for that segment, the segment is skipped for `50000 GF` before it can
+be selected again. Unlike the building-local secondary road pass, this trigger
+is not tied to a newly completed building; the hot workload segment chooses the
+area of interest.
 
 ## Waterway Shortcuts
 
@@ -329,8 +331,8 @@ existing large-ship policy.
 - `MinorRoadImprovements()` currently returns immediately into `BuildRoad()`.
   The code below that early return is effectively disabled.
 - The construction heuristics are greedy. The workload bypass activation scans
-  globally for hot segments, but each build attempt still uses a bounded local
-  candidate search around that segment's endpoints.
+  globally for hot segments, but each activation attempts a bounded local
+  candidate search around only one eligible segment's endpoints.
 
 ## Practical Takeaways
 

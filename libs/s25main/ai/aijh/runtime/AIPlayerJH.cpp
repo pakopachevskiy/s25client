@@ -39,8 +39,8 @@
 namespace {
 
 constexpr unsigned kRoadWorkloadBypassIntervalGF = 2500;
-constexpr unsigned kRoadWorkloadBypassThreshold = 600;
-constexpr unsigned kRoadWorkloadBypassMaxSegmentsPerPass = 8;
+constexpr unsigned kRoadWorkloadBypassThreshold = 40;
+constexpr unsigned kRoadWorkloadBypassFailureCooldownGF = 50000;
 
 void HandleBuildingNote(AIEventManager& eventMgr, const BuildingNote& note)
 {
@@ -357,17 +357,46 @@ void AIPlayerJH::TryBuildRoadWorkloadBypass()
 {
     roadWorkload_->Refresh();
 
-    std::vector<Direction> route;
-    unsigned checkedSegments = 0;
-    for(const RoadWorkloadSegment& hotSegment : roadWorkload_->GetHotSegments(kRoadWorkloadBypassThreshold))
+    for(auto it = roadWorkloadBypassRetryAfterGF_.begin(); it != roadWorkloadBypassRetryAfterGF_.end();)
+    {
+        if(currentGF_ >= it->second)
+            it = roadWorkloadBypassRetryAfterGF_.erase(it);
+        else
+            ++it;
+    }
+
+    const auto getSegmentKey = [](const RoadWorkloadSegment& segment) {
+        const MapPointLess less;
+        if(less(segment.flag2, segment.flag1))
+            return RoadWorkloadBypassSegmentKey{segment.flag2, segment.flag1};
+        return RoadWorkloadBypassSegmentKey{segment.flag1, segment.flag2};
+    };
+
+    // GetHotSegments is inclusive, while the bypass trigger is strictly above the configured threshold.
+    const std::vector<RoadWorkloadSegment> hotSegments =
+      roadWorkload_->GetHotSegments(kRoadWorkloadBypassThreshold + 1);
+    const RoadWorkloadSegment* selectedSegment = nullptr;
+    RoadWorkloadBypassSegmentKey selectedKey;
+    for(const RoadWorkloadSegment& hotSegment : hotSegments)
     {
         if(hotSegment.waterRoad)
             continue;
-        if(checkedSegments++ >= kRoadWorkloadBypassMaxSegmentsPerPass)
-            break;
-        if(construction->BuildAlternativeRoadBypassingSegment(hotSegment, route))
-            break;
+
+        const RoadWorkloadBypassSegmentKey key = getSegmentKey(hotSegment);
+        if(roadWorkloadBypassRetryAfterGF_.find(key) != roadWorkloadBypassRetryAfterGF_.end())
+            continue;
+
+        selectedSegment = &hotSegment;
+        selectedKey = key;
+        break;
     }
+
+    if(!selectedSegment)
+        return;
+
+    std::vector<Direction> route;
+    if(!construction->BuildAlternativeRoadBypassingSegment(*selectedSegment, route))
+        roadWorkloadBypassRetryAfterGF_[selectedKey] = currentGF_ + kRoadWorkloadBypassFailureCooldownGF;
 }
 
 bool AIPlayerJH::TestDefeat()

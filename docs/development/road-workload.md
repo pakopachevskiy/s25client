@@ -162,10 +162,11 @@ though they do not add a score.
 
 ## AI Bypass Use
 
-After the `2500 GF` refresh, `AIPlayerJH` inspects hot land segments with a
-workload score of at least `600`, capped to the first `8` sorted hotspots. For
-each candidate, `AIConstruction::BuildAlternativeRoadBypassingSegment()` looks
-for a new land road whose current road-network path crosses the hot segment.
+After the `2500 GF` refresh, `AIPlayerJH` picks the highest-workload land
+segment with a workload score greater than `40` and asks
+`AIConstruction::BuildAlternativeRoadBypassingSegment()` to look for a new land
+road whose current road-network path crosses that hot segment. Only one segment
+is attempted per activation.
 
 The build attempt is intentionally conservative:
 
@@ -176,7 +177,10 @@ The build attempt is intentionally conservative:
 - an already existing path around the hot segment suppresses the build when it
   is no longer than the proposed new road.
 
-Only one bypass can be queued per activation.
+If no bypass can be built for the selected segment, the AI suppresses retrying
+that exact flag-to-flag segment for `50000 GF`. After the cooldown expires it
+can be selected again if it is still the highest eligible hotspot. Only one
+bypass can be queued per activation.
 
 ## Overlay Rendering
 
