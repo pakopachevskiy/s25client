@@ -26,6 +26,7 @@ public:
 private:
     bool IsSuitableBuildingPosition(BuildingType type, const MapPoint& pt, const AIQueryService& queries) const;
     bool CheckProximity(BuildingType type, const MapPoint& pt) const;
+    std::optional<double> GetPointRatingInternal(BuildingType type, const MapPoint& pt, bool useSmartForest) const;
     bool ValidFishInRange(MapPoint pt) const;
     bool ValidStoneinRange(MapPoint pt) const;
 

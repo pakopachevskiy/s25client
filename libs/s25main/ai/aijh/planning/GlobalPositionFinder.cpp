@@ -17,9 +17,18 @@
 #include "ai/aijh/config/WeightParams.h"
 #include "GlobalGameSettings.h"
 #include "addons/const_addons.h"
+#include "nodeObjs/noBase.h"
 
 namespace AIJH {
 namespace {
+struct SmartForestMetrics
+{
+    unsigned plantable = 0;
+    unsigned lowValue = 0;
+    unsigned highValue = 0;
+    double score = 0.0;
+};
+
 bool IsBorderBlocked(const AIWorldView& aijh, const AIQueryService& queries, const BuildingType type,
                      const MapPoint& pt)
 {
@@ -36,6 +45,9 @@ int ComputeRatingBonus(const AIWorldView& aijh, AIConstruction& construction, co
     const auto& locationParams = aijh.GetConfig().locationParams[buildingType];
     for(const auto targetType : helpers::enumRange<BuildingType>())
     {
+        if(buildingType == BuildingType::Forester && targetType == BuildingType::Woodcutter)
+            continue;
+
         const auto& ratingParams = locationParams.rating[targetType];
         if(!ratingParams.enabled)
             continue;
@@ -51,6 +63,103 @@ int ComputeRatingBonus(const AIWorldView& aijh, AIConstruction& construction, co
         totalBonus += neighbors * multiplier;
     }
     return totalBonus;
+}
+
+bool IsForesterPlantablePoint(const GameWorldBase& world, const MapPoint pt)
+{
+    const noBase* obj = world.GetNO(pt);
+    if(obj->GetBM() != BlockingManner::None)
+        return false;
+
+    if(world.GetNode(pt).boundary_stones[BorderStonePos::OnPoint])
+        return false;
+
+    for(const auto dir : helpers::EnumRange<Direction>{})
+    {
+        if(world.GetPointRoad(pt, dir) != PointRoad::None)
+            return false;
+    }
+
+    for(const MapPoint nb : world.GetNeighbours(pt))
+    {
+        if(world.GetNO(nb)->GetType() == NodalObjectType::Building)
+            return false;
+    }
+
+    return world.IsOfTerrain(pt, [](const auto& desc) { return desc.IsVital(); });
+}
+
+double GetSmartForestBQScore(const BuildingQuality bq)
+{
+    switch(bq)
+    {
+        case BuildingQuality::Flag: return 8.0;
+        case BuildingQuality::Hut: return 6.0;
+        case BuildingQuality::Nothing: return 12.0;
+        case BuildingQuality::House: return -12.0;
+        case BuildingQuality::Mine: return -8.0;
+        case BuildingQuality::Castle: return -32.0;
+        case BuildingQuality::Harbor: return -40.0;
+        default: return 0.0;
+    }
+}
+
+bool IsSmartForestLowValueBQ(const BuildingQuality bq)
+{
+    return bq == BuildingQuality::Flag || bq == BuildingQuality::Hut;
+}
+
+bool IsSmartForestHighValueBQ(const BuildingQuality bq)
+{
+    return bq == BuildingQuality::House || bq == BuildingQuality::Castle || bq == BuildingQuality::Harbor
+           || bq == BuildingQuality::Mine;
+}
+
+SmartForestMetrics ComputeSmartForestMetrics(const AIWorldView& aijh, const SmartForestConfig& config,
+                                             const MapPoint& candidate)
+{
+    const GameWorldBase& world = aijh.GetWorld();
+    SmartForestMetrics metrics;
+    for(const MapPoint pt : world.GetPointsInRadiusWithCenter(candidate, config.radius))
+    {
+        if(!IsForesterPlantablePoint(world, pt))
+            continue;
+
+        const BuildingQuality bq = aijh.GetAINode(pt).bq;
+        ++metrics.plantable;
+        metrics.score += GetSmartForestBQScore(bq);
+        if(IsSmartForestLowValueBQ(bq))
+            ++metrics.lowValue;
+        if(IsSmartForestHighValueBQ(bq))
+            ++metrics.highValue;
+    }
+
+    metrics.score += 2.0 * metrics.plantable;
+    return metrics;
+}
+
+std::optional<double> ComputeSmartForestRating(const AIWorldView& aijh, AIConstruction& construction,
+                                               const SmartForestConfig& config, const MapPoint& candidate)
+{
+    const SmartForestMetrics metrics = ComputeSmartForestMetrics(aijh, config, candidate);
+    if(metrics.plantable < config.minPlantable)
+        return std::nullopt;
+
+    const double plantable = static_cast<double>(metrics.plantable);
+    if(static_cast<double>(metrics.lowValue) / plantable < config.minLowValueRatio)
+        return std::nullopt;
+    if(static_cast<double>(metrics.highValue) / plantable > config.maxHighValueRatio)
+        return std::nullopt;
+
+    const unsigned forestersInZone =
+      construction.CountUsualBuildingInRadius(candidate, config.radius, BuildingType::Forester) + 1;
+    if(forestersInZone > config.maxClusterForesters)
+        return std::nullopt;
+
+    const double clusterPenalty =
+      std::max(0.0, static_cast<double>(config.plantablePerForester * forestersInZone)
+                      - static_cast<double>(metrics.plantable));
+    return metrics.score - clusterPenalty;
 }
 
 bool MeetsMinimalResourceRequirement(const AIWorldView& aijh, const BuildingType type, const AIResource res,
@@ -176,13 +285,19 @@ bool GlobalPositionFinder::CheckProximity(const BuildingType type, const MapPoin
 
     for(const auto otherType : helpers::enumRange<BuildingType>())
     {
+        if(type == BuildingType::Forester && otherType == BuildingType::Forester)
+            continue;
+
         const ProximityParams proximity = locationParam.proximity[otherType];
         if(proximity.enabled)
         {
             const unsigned minRadius = static_cast<unsigned>(CALC::calcCount(buildingCount, proximity.minimal));
             if(otherType == BuildingType::Storehouse)
-                return !construction.OtherStoreInRadius(pt, minRadius);
-            return !construction.OtherUsualBuildingInRadius(pt, minRadius, otherType);
+            {
+                if(construction.OtherStoreInRadius(pt, minRadius))
+                    return false;
+            } else if(construction.OtherUsualBuildingInRadius(pt, minRadius, otherType))
+                return false;
         }
     }
     return true;
@@ -233,6 +348,12 @@ bool GlobalPositionFinder::ValidStoneinRange(const MapPoint pt) const
 
 std::optional<double> GlobalPositionFinder::GetPointRating(const BuildingType type, const MapPoint& pt) const
 {
+    return GetPointRatingInternal(type, pt, true);
+}
+
+std::optional<double> GlobalPositionFinder::GetPointRatingInternal(const BuildingType type, const MapPoint& pt,
+                                                                   const bool useSmartForest) const
+{
     const AIQueryService& queries = aijh.GetInterface().Queries();
     if(!IsSuitableBuildingPosition(type, pt, queries) || !CheckProximity(type, pt))
         return std::nullopt;
@@ -249,7 +370,14 @@ std::optional<double> GlobalPositionFinder::GetPointRating(const BuildingType ty
     }
 
     double baseRating = 0;
-    if(UseMinimalResourceOnlyForInexhaustibleMine(aijh, type))
+    if(useSmartForest && type == BuildingType::Forester && aijh.GetConfig().smartForest.enabled)
+    {
+        const std::optional<double> smartForestRating =
+          ComputeSmartForestRating(aijh, construction, aijh.GetConfig().smartForest, pt);
+        if(!smartForestRating)
+            return std::nullopt;
+        baseRating = *smartForestRating;
+    } else if(UseMinimalResourceOnlyForInexhaustibleMine(aijh, type))
         baseRating = 25.0;
     else
         baseRating = ComputeResourceRating(aijh, queries, construction, type, pt);
@@ -260,22 +388,31 @@ std::optional<double> GlobalPositionFinder::GetPointRating(const BuildingType ty
 MapPoint GlobalPositionFinder::FindBestPosition(const BuildingType bt)
 {
     aijh.RecordGlobalPositionSearchInvocation();
-    int bestValue = 0;
-    MapPoint bestPt = MapPoint::Invalid();
-    const MapExtent mapSize = aijh.GetWorld().GetSize();
+    auto findBest = [this, bt](const bool useSmartForest) {
+        double bestValue = 0.0;
+        MapPoint bestPt = MapPoint::Invalid();
+        const MapExtent mapSize = aijh.GetWorld().GetSize();
 
-    RTTR_FOREACH_PT(MapPoint, mapSize)
-    {
-        const std::optional<int> pointRating = GetPointRating(bt, pt);
-        if(!pointRating)
-            continue;
-        if(*pointRating > bestValue)
+        RTTR_FOREACH_PT(MapPoint, mapSize)
         {
-            bestValue = *pointRating;
-            bestPt = pt;
+            const std::optional<double> pointRating = GetPointRatingInternal(bt, pt, useSmartForest);
+            if(!pointRating)
+                continue;
+            if(*pointRating > bestValue)
+            {
+                bestValue = *pointRating;
+                bestPt = pt;
+            }
         }
-    }
+
+        return bestPt;
+    };
+
+    MapPoint bestPt = findBest(true);
+    if(!bestPt.isValid() && bt == BuildingType::Forester && aijh.GetConfig().smartForest.enabled)
+        bestPt = findBest(false);
 
     return bestPt;
 }
+
 } // namespace AIJH

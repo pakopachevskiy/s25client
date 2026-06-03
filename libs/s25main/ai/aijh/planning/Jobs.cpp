@@ -263,7 +263,10 @@ void BuildJob::BuildMainRoad()
 
     switch(type)
     {
-        // case BuildingType::Forester: aijh.AddBuildJob(BuildingType::Woodcutter, target); break;
+        case BuildingType::Forester:
+            if(aiConstruction.Wanted(BuildingType::Woodcutter))
+                aijh.AddBuildJob(BuildingType::Woodcutter, target);
+            break;
         case BuildingType::Charburner:
         case BuildingType::Farm:
         {

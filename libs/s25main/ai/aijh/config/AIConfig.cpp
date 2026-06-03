@@ -50,7 +50,6 @@ AIConfig::AIConfig()
     setResourceRating(BuildingType::Woodcutter, AIResource::Wood, 7, 300);
     locationParams[BuildingType::Woodcutter].rating[BuildingType::Forester].enabled = true;
     setResourceRating(BuildingType::Forester, AIResource::Plantspace, 6, 50);
-    locationParams[BuildingType::Forester].rating[BuildingType::Woodcutter].enabled = true;
     setResourceRating(BuildingType::Farm, AIResource::Plantspace, 0, 0);
     setResourceRating(BuildingType::Quarry, AIResource::Stones, 0, 0);
     setResourceRating(BuildingType::Fishery, AIResource::Fish, 0, 0);
@@ -322,6 +321,34 @@ void applyTroopsDistributionCfg(const YAML::Node& troopsDistributionNode, AIConf
 
     applyTroopsDistributionStrategyCfg(troopsDistributionNode["strategy"], config);
     applyTroopsDistributionFrontierMultipliersCfg(troopsDistributionNode["frontierMultipliers"], config);
+}
+
+void applySmartForestCfg(const YAML::Node& smartForestNode, AIConfig& config)
+{
+    if(!smartForestNode)
+        return;
+
+    try
+    {
+        if(const YAML::Node value = smartForestNode["enabled"])
+            config.smartForest.enabled = value.as<bool>();
+        if(const YAML::Node value = smartForestNode["radius"])
+            config.smartForest.radius = value.as<unsigned>();
+        if(const YAML::Node value = smartForestNode["minPlantable"])
+            config.smartForest.minPlantable = value.as<unsigned>();
+        if(const YAML::Node value = smartForestNode["minLowValueRatio"])
+            config.smartForest.minLowValueRatio = value.as<double>();
+        if(const YAML::Node value = smartForestNode["maxHighValueRatio"])
+            config.smartForest.maxHighValueRatio = value.as<double>();
+        if(const YAML::Node value = smartForestNode["maxClusterForesters"])
+            config.smartForest.maxClusterForesters = value.as<unsigned>();
+        if(const YAML::Node value = smartForestNode["plantablePerForester"])
+            config.smartForest.plantablePerForester = value.as<unsigned>();
+    } catch(const YAML::Exception& e)
+    {
+        std::cerr << "Warning: Invalid smartForest value, using defaults where needed. Error: " << e.what()
+                  << std::endl;
+    }
 }
 
 void applyPosFinderCfg(const YAML::Node& posFinder, AIConfig& config)
@@ -719,6 +746,7 @@ extern void applyWeightsCfg(std::string weightCfgPath, AIConfig& targetConfig)
         applyDistributionAdjusterCfg(rootNode["distributionAdjuster"], targetConfig);
         applyBQPenaltyCfg(rootNode["bqPenalty"], targetConfig);
         applyTroopsDistributionCfg(rootNode["troopsDistribution"], targetConfig);
+        applySmartForestCfg(rootNode["smartForest"], targetConfig);
         if(const YAML::Node value = rootNode["reserveMilitaryBorderSlots"])
         {
             try

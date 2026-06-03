@@ -23,6 +23,46 @@ BOOST_AUTO_TEST_CASE(MaxBuildingSites_DefaultsToForty)
     BOOST_TEST(config.builderAdvance.constant == 1.0);
 }
 
+BOOST_AUTO_TEST_CASE(SmartForest_DefaultsAreEnabled)
+{
+    const AIConfig config;
+    BOOST_TEST(config.smartForest.enabled);
+    BOOST_TEST(config.smartForest.radius == 6u);
+    BOOST_TEST(config.smartForest.minPlantable == 18u);
+    BOOST_TEST(config.smartForest.minLowValueRatio == 0.60);
+    BOOST_TEST(config.smartForest.maxHighValueRatio == 0.20);
+    BOOST_TEST(config.smartForest.maxClusterForesters == 3u);
+    BOOST_TEST(config.smartForest.plantablePerForester == 18u);
+}
+
+BOOST_AUTO_TEST_CASE(SmartForest_CanBeParsed)
+{
+    const std::string configPath = "/tmp/rttr-ai-smart-forest.yaml";
+    {
+        std::ofstream out(configPath);
+        BOOST_TEST_REQUIRE(out.good());
+        out << "smartForest:\n";
+        out << "  enabled: false\n";
+        out << "  radius: 5\n";
+        out << "  minPlantable: 12\n";
+        out << "  minLowValueRatio: 0.5\n";
+        out << "  maxHighValueRatio: 0.25\n";
+        out << "  maxClusterForesters: 2\n";
+        out << "  plantablePerForester: 14\n";
+    }
+
+    AIConfig config;
+    applyWeightsCfg(configPath, config);
+
+    BOOST_TEST(!config.smartForest.enabled);
+    BOOST_TEST(config.smartForest.radius == 5u);
+    BOOST_TEST(config.smartForest.minPlantable == 12u);
+    BOOST_TEST(config.smartForest.minLowValueRatio == 0.5);
+    BOOST_TEST(config.smartForest.maxHighValueRatio == 0.25);
+    BOOST_TEST(config.smartForest.maxClusterForesters == 2u);
+    BOOST_TEST(config.smartForest.plantablePerForester == 14u);
+}
+
 BOOST_AUTO_TEST_CASE(BQPenaltyConfig_DefaultRoadRouteQualityValues)
 {
     const AIConfig config;

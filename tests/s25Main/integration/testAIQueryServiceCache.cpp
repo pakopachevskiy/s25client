@@ -5,6 +5,8 @@
 #include "RttrForeachPt.h"
 #include "ai/AIQueryService.h"
 #include "ai/AIResource.h"
+#include "buildings/noBuildingSite.h"
+#include "gameData/BuildingConsts.h"
 #include "helpers/EnumRange.h"
 #include "worldFixtures/CreateEmptyWorld.h"
 #include "worldFixtures/WorldFixture.h"
@@ -18,6 +20,19 @@ using SmallWorldFixture = WorldFixture<CreateEmptyWorld, 1>;
 using LargerWorldFixture = WorldFixture<CreateEmptyWorld, 1, 24, 22>;
 
 constexpr unsigned kDefaultTTL = 1000; // kDefaultTTL used for Wood, Plantspace
+
+MapPoint FindBuildablePoint(const GameWorldBase& world, const BuildingType type)
+{
+    const MapPoint hqPos = world.GetPlayer(0).GetHQPos();
+    for(const MapPoint pt : world.GetPointsInRadiusWithCenter(hqPos, 9))
+    {
+        if(world.CalcDistance(pt, hqPos) < 5)
+            continue;
+        if(canUseBq(world.GetNode(pt).bq, BUILDING_SIZE[type]))
+            return pt;
+    }
+    return MapPoint::Invalid();
+}
 } // namespace
 
 BOOST_FIXTURE_TEST_CASE(SameFrameHit, SmallWorldFixture)
@@ -69,6 +84,28 @@ BOOST_FIXTURE_TEST_CASE(TTLExpiryIsAMiss, SmallWorldFixture)
     queries.CalcResourceValue(pt, AIResource::Wood);
     BOOST_TEST(queries.GetResourceValueCacheMisses() == 2u);
     BOOST_TEST(queries.GetResourceValueCacheHits() == 0u);
+}
+
+BOOST_FIXTURE_TEST_CASE(Plantspace_DoesNotPenalizeFarmSites, LargerWorldFixture)
+{
+    const MapPoint farmPt = FindBuildablePoint(world, BuildingType::Farm);
+    BOOST_TEST_REQUIRE(farmPt.isValid());
+    world.SetBuildingSite(BuildingType::Farm, farmPt, 0);
+    BOOST_TEST_REQUIRE(world.GetSpecObj<noBuildingSite>(farmPt));
+
+    AIQueryService queries(world, 0);
+    BOOST_TEST(queries.GetResourceRating(farmPt, AIResource::Plantspace) == 0);
+}
+
+BOOST_FIXTURE_TEST_CASE(Plantspace_DoesNotPenalizeForesterSites, LargerWorldFixture)
+{
+    const MapPoint foresterPt = FindBuildablePoint(world, BuildingType::Forester);
+    BOOST_TEST_REQUIRE(foresterPt.isValid());
+    world.SetBuildingSite(BuildingType::Forester, foresterPt, 0);
+    BOOST_TEST_REQUIRE(world.GetSpecObj<noBuildingSite>(foresterPt));
+
+    AIQueryService queries(world, 0);
+    BOOST_TEST(queries.GetResourceRating(foresterPt, AIResource::Plantspace) == 0);
 }
 
 BOOST_FIXTURE_TEST_CASE(EvictionSweepsExpiredEntries, LargerWorldFixture)

@@ -362,10 +362,6 @@ int AIQueryService::GetResourceRating(const MapPoint pt, AIResource res) const
             if(GetSurfaceResource(pt) == AISurfaceResource::Nothing
                && gwb.GetDescription().get(gwb.GetNode(pt).t1).IsVital())
                 return RES_RADIUS[res];
-            else if(IsBuildingOnNode(pt, BuildingType::Forester))
-                return -40;
-            else if(IsBuildingOnNode(pt, BuildingType::Farm))
-                return -20;
             break;
         case AIResource::Borderland:
             if(IsOwnTerritory(pt) && !IsBorder(pt))

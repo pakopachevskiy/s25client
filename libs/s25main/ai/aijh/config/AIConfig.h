@@ -62,6 +62,17 @@ struct TroopsDistributionConfig
     TroopsDistributionConfig();
 };
 
+struct SmartForestConfig
+{
+    bool enabled = true;
+    unsigned radius = 6;
+    unsigned minPlantable = 18;
+    double minLowValueRatio = 0.60;
+    double maxHighValueRatio = 0.20;
+    unsigned maxClusterForesters = 3;
+    unsigned plantablePerForester = 18;
+};
+
 struct AIConfig
 {
     helpers::EnumArray<WantedParams, BuildingType> wantedParams;
@@ -70,6 +81,7 @@ struct AIConfig
     CombatConfig combat;
     BQPenaltyConfig bqPenalty;
     TroopsDistributionConfig troopsDistribution;
+    SmartForestConfig smartForest;
     bool reserveMilitaryBorderSlots = true;
     unsigned reserveMilitaryBorderlandThreshold = 110;
     unsigned maxBuildingSites = 40;

@@ -79,6 +79,31 @@ void SetAllOwned(GameWorld& world)
         world.SetOwner(pt, 1);
 }
 
+void MakeAIRegionBuildable(AIJH::AIPlayerJH& ai, const GameWorldBase& world, const MapPoint center,
+                           const unsigned radius, const BuildingQuality bq)
+{
+    for(const MapPoint pt : world.GetPointsInRadiusWithCenter(center, radius))
+    {
+        auto& node = ai.GetAINode(pt);
+        node.owned = true;
+        node.reachable = true;
+        node.farmed = false;
+        node.bq = bq;
+    }
+    ai.GetAINode(center).bq = BuildingQuality::Hut;
+}
+
+MapPoint FindForesterCandidate(const GameWorldBase& world, const MapPoint hqPos)
+{
+    for(const MapPoint pt : world.GetPointsInRadiusWithCenter(hqPos, 9))
+    {
+        if(world.CalcDistance(pt, hqPos) >= 6 && world.CalcDistance(pt, hqPos) <= 8
+           && world.GetNode(pt).bq >= BuildingQuality::Hut)
+            return pt;
+    }
+    return MapPoint::Invalid();
+}
+
 MapPoint GetRouteEnd(const GameWorldBase& world, MapPoint pt, const std::vector<Direction>& route)
 {
     for(const Direction dir : route)
@@ -212,6 +237,93 @@ BOOST_FIXTURE_TEST_CASE(PointRating_IsUnavailableForUnsuitableNode, WorldWithGCE
 
     ai.GetAINode(ratedPt).farmed = true;
     BOOST_TEST(!ai.GetPointRating(BuildingType::Well, ratedPt));
+}
+
+BOOST_FIXTURE_TEST_CASE(ForesterSmartForest_RejectsCastleHeavyPlantableZone, BiggerWorldWithGCExecution)
+{
+    SetAllOwned(world);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    const MapPoint candidate = FindForesterCandidate(world, hqPos);
+    BOOST_TEST_REQUIRE(candidate.isValid());
+
+    MakeAIRegionBuildable(ai, world, candidate, ai.GetConfig().smartForest.radius, BuildingQuality::Castle);
+
+    BOOST_TEST(!ai.GetPointRating(BuildingType::Forester, candidate));
+}
+
+BOOST_FIXTURE_TEST_CASE(ForesterSmartForest_AcceptsLowValuePlantableZone, BiggerWorldWithGCExecution)
+{
+    SetAllOwned(world);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    const MapPoint candidate = FindForesterCandidate(world, hqPos);
+    BOOST_TEST_REQUIRE(candidate.isValid());
+
+    MakeAIRegionBuildable(ai, world, candidate, ai.GetConfig().smartForest.radius, BuildingQuality::Flag);
+
+    BOOST_TEST(ai.GetPointRating(BuildingType::Forester, candidate).has_value());
+}
+
+BOOST_FIXTURE_TEST_CASE(ForesterSmartForest_PrefersCenterOfLowValuePatch, BiggerWorldWithGCExecution)
+{
+    SetAllOwned(world);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    const MapPoint center = FindForesterCandidate(world, hqPos);
+    BOOST_TEST_REQUIRE(center.isValid());
+    const MapPoint edge = world.GetNeighbour(world.GetNeighbour(center, Direction::East), Direction::East);
+    BOOST_TEST_REQUIRE(edge.isValid());
+
+    MakeAIRegionBuildable(ai, world, center, ai.GetConfig().smartForest.radius + 2, BuildingQuality::Castle);
+    MakeAIRegionBuildable(ai, world, center, ai.GetConfig().smartForest.radius, BuildingQuality::Flag);
+    ai.GetAINode(edge).bq = BuildingQuality::Hut;
+
+    const auto centerRating = ai.GetPointRating(BuildingType::Forester, center);
+    const auto edgeRating = ai.GetPointRating(BuildingType::Forester, edge);
+    BOOST_TEST_REQUIRE(centerRating.has_value());
+    if(edgeRating)
+        BOOST_TEST(*centerRating > *edgeRating);
+}
+
+BOOST_FIXTURE_TEST_CASE(ForesterSmartForest_ClustersWithoutForesterProximityRejection, BiggerWorldWithGCExecution)
+{
+    SetAllOwned(world);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    const MapPoint candidate = FindForesterCandidate(world, hqPos);
+    BOOST_TEST_REQUIRE(candidate.isValid());
+    const MapPoint existingForester =
+      world.GetNeighbour(world.GetNeighbour(candidate, Direction::East), Direction::East);
+    BOOST_TEST_REQUIRE(existingForester.isValid());
+
+    MakeAIRegionBuildable(ai, world, candidate, ai.GetConfig().smartForest.radius, BuildingQuality::Flag);
+    ai.GetAINode(existingForester).bq = BuildingQuality::Hut;
+    world.SetBuildingSite(BuildingType::Forester, existingForester, curPlayer);
+    BOOST_TEST_REQUIRE(world.GetSpecObj<noBuildingSite>(existingForester));
+    ai.GetAINode(existingForester).bq = BuildingQuality::Hut;
+
+    BOOST_TEST(ai.GetPointRating(BuildingType::Forester, candidate).has_value());
+}
+
+BOOST_FIXTURE_TEST_CASE(ForesterSmartForest_AppliesClusterPenalty, BiggerWorldWithGCExecution)
+{
+    SetAllOwned(world);
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    const MapPoint candidate = FindForesterCandidate(world, hqPos);
+    BOOST_TEST_REQUIRE(candidate.isValid());
+    const MapPoint existingForester =
+      world.GetNeighbour(world.GetNeighbour(candidate, Direction::East), Direction::East);
+    BOOST_TEST_REQUIRE(existingForester.isValid());
+
+    MakeAIRegionBuildable(ai, world, candidate, ai.GetConfig().smartForest.radius, BuildingQuality::Flag);
+    const auto baseRating = ai.GetPointRating(BuildingType::Forester, candidate);
+    BOOST_TEST_REQUIRE(baseRating.has_value());
+
+    ai.GetAINode(existingForester).bq = BuildingQuality::Hut;
+    world.SetBuildingSite(BuildingType::Forester, existingForester, curPlayer);
+    BOOST_TEST_REQUIRE(world.GetSpecObj<noBuildingSite>(existingForester));
+    ai.GetAINode(existingForester).bq = BuildingQuality::Hut;
+
+    const auto clusteredRating = ai.GetPointRating(BuildingType::Forester, candidate);
+    BOOST_TEST_REQUIRE(clusteredRating.has_value());
+    BOOST_TEST(*clusteredRating < *baseRating);
 }
 
 BOOST_FIXTURE_TEST_CASE(KeepBQUpdated, BiggerWorldWithGCExecution)
