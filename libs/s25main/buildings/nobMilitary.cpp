@@ -15,6 +15,7 @@
 #include "SerializedGameData.h"
 #include "TroopsLimitEventLogger.h"
 #include "Ware.h"
+#include "WareProductionStatsHolder.h"
 #include "addons/const_addons.h"
 #include "CombatEventLogger.h"
 #include "buildings/nobBaseWarehouse.h"
@@ -312,6 +313,8 @@ void nobMilitary::HandleEvent(const unsigned id)
                 // Consume one gold coin
                 --numCoins;
                 world->GetPlayer(player).DecreaseInventoryWare(GoodType::Coins, 1, GetObjId());
+                WareProductionStatsHolder::ReportConsumed(GetEvMgr().GetCurrentGF(), player, GoodType::Coins,
+                                                          bldType_);
 
                 RegulateTroops();
 

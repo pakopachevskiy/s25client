@@ -12,6 +12,7 @@
 #include "MilitaryEventLogger.h"
 #include "SerializedGameData.h"
 #include "Ware.h"
+#include "WareProductionStatsHolder.h"
 #include "WineLoader.h"
 #include "commonDefines.h"
 #include "factories/JobFactory.h"
@@ -484,12 +485,18 @@ void nobBaseWarehouse::HandleRecrutingEvent()
 
     inventory.Remove(GoodType::Sword, real_recruits);
     owner.DecreaseInventoryWare(GoodType::Sword, real_recruits, GetObjId());
+    WareProductionStatsHolder::ReportConsumed(GetEvMgr().GetCurrentGF(), player, GoodType::Sword, bldType_,
+                                              real_recruits);
 
     inventory.Remove(GoodType::ShieldRomans, real_recruits);
     owner.DecreaseInventoryWare(GoodType::ShieldRomans, real_recruits, GetObjId());
+    WareProductionStatsHolder::ReportConsumed(GetEvMgr().GetCurrentGF(), player, GoodType::ShieldRomans, bldType_,
+                                              real_recruits);
 
     inventory.Remove(GoodType::Beer, real_recruits);
     owner.DecreaseInventoryWare(GoodType::Beer, real_recruits, GetObjId());
+    WareProductionStatsHolder::ReportConsumed(GetEvMgr().GetCurrentGF(), player, GoodType::Beer, bldType_,
+                                              real_recruits);
 
     // Try to schedule another recruitment if possible
     TryRecruiting();
@@ -1149,6 +1156,7 @@ bool nobBaseWarehouse::TryRecruitJob(const Job job)
     {
         inventory.Remove(requiredTool);
         owner.DecreaseInventoryWare(requiredTool, 1, GetObjId());
+        WareProductionStatsHolder::ReportConsumed(GetEvMgr().GetCurrentGF(), player, requiredTool, bldType_);
     }
 
     inventory.Remove(Job::Helper);

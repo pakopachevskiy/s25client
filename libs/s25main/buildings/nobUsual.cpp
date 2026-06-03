@@ -10,6 +10,7 @@
 #include "Loader.h"
 #include "SerializedGameData.h"
 #include "Ware.h"
+#include "WareProductionStatsHolder.h"
 #include "addons/const_addons.h"
 #include "figures/nofBuildingWorker.h"
 #include "figures/nofPigbreeder.h"
@@ -419,7 +420,9 @@ void nobUsual::ConsumeWares()
         // Bestand verringern
         --numWares[wareIdxToUse];
         // Inventur entsprechend verringern
-        owner.DecreaseInventoryWare(workDesc.waresNeeded[wareIdxToUse], 1, GetObjId());
+        const GoodType consumedWare = workDesc.waresNeeded[wareIdxToUse];
+        owner.DecreaseInventoryWare(consumedWare, 1, GetObjId());
+        WareProductionStatsHolder::ReportConsumed(GetEvMgr().GetCurrentGF(), player, consumedWare, bldType_);
 
         // try to get ware from warehouses
         if(numWares[wareIdxToUse] < 2)
@@ -577,6 +580,7 @@ void nobUsual::StopNotWorking()
 void nobUsual::RegisterProducedGood(const GoodType good)
 {
     ++totalProducedGoods;
+    WareProductionStatsHolder::ReportProduced(GetEvMgr().GetCurrentGF(), player, good);
     world->GetNotifications().publish(
       ProductionNote(player, GetPos(), GetBuildingType(), good));
 }

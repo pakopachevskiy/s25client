@@ -58,6 +58,7 @@ set(s25Main_SRCS
         MilitaryEventLogger.cpp
         RoadEventLogger.cpp
         MilitaryStatsHolder.cpp
+        WareProductionStatsHolder.cpp
         TroopsLimitEventLogger.cpp
         ToolPriorityEventLogger.cpp
         WareEventLogger.cpp

@@ -9,6 +9,7 @@
 #include "Loader.h"
 #include "SerializedGameData.h"
 #include "Ware.h"
+#include "WareProductionStatsHolder.h"
 #include "figures/noFigure.h"
 #include "figures/nofAttacker.h"
 #include "figures/nofDefender.h"
@@ -330,6 +331,7 @@ void nobHarborBuilding::StartExpedition()
         {
             inventory.Remove(GoodType::Hammer);
             owner.DecreaseInventoryWare(GoodType::Hammer, 1, GetObjId());
+            WareProductionStatsHolder::ReportConsumed(GetEvMgr().GetCurrentGF(), player, GoodType::Hammer, bldType_);
             inventory.Remove(Job::Helper);
             owner.DecreaseInventoryJob(Job::Helper, 1);
 

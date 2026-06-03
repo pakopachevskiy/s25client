@@ -10,6 +10,7 @@
 #include "Loader.h"
 #include "SerializedGameData.h"
 #include "Ware.h"
+#include "WareProductionStatsHolder.h"
 #include "figures/nofBuilder.h"
 #include "figures/nofPlaner.h"
 #include "helpers/containerUtils.h"
@@ -69,7 +70,11 @@ noBuildingSite::noBuildingSite(const MapPoint pos, const unsigned char player)
 
     // Deduct the construction materials from the owner's inventory
     owner.DecreaseInventoryWare(GoodType::Boards, boards, GetObjId());
+    WareProductionStatsHolder::ReportConstructionConsumed(world->GetEvMgr().GetCurrentGF(), player, GoodType::Boards,
+                                                          boards);
     owner.DecreaseInventoryWare(GoodType::Stones, stones, GetObjId());
+    WareProductionStatsHolder::ReportConstructionConsumed(world->GetEvMgr().GetCurrentGF(), player, GoodType::Stones,
+                                                          stones);
 }
 
 noBuildingSite::~noBuildingSite() = default;
@@ -319,6 +324,7 @@ void noBuildingSite::AddWare(std::unique_ptr<Ware> ware)
 
     // Decrease the player's inventory accordingly
     world->GetPlayer(player).DecreaseInventoryWare(ware->type, 1, GetObjId());
+    WareProductionStatsHolder::ReportConstructionConsumed(world->GetEvMgr().GetCurrentGF(), player, ware->type);
     world->GetPlayer(player).RemoveWare(*ware);
 }
 
