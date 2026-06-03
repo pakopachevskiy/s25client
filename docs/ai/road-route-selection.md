@@ -36,6 +36,9 @@ considers the "best" road.
 - Independently of building jobs, `AIPlayerJH::RunGF()` periodically refreshes
   the road-workload snapshot and may call
   `BuildAlternativeRoadBypassingSegment()` for a globally hot segment.
+- Every `5000 GF`, `AIPlayerJH::RunGF()` may also call
+  `BuildAlternativeRoadNearWarehouse()` to add one connectivity-improving
+  shortcut near headquarters and storehouses.
 
 ## What the AI Optimizes For
 
@@ -290,6 +293,38 @@ a bypass for that segment, the segment is skipped for `50000 GF` before it can
 be selected again. Unlike the building-local secondary road pass, this trigger
 is not tied to a newly completed building; the hot workload segment chooses the
 area of interest.
+
+## Storehouse Connectivity Shortcuts
+
+The AI has a second low-frequency global activation focused on the core
+warehouse network. Every `5000 GF`, staggered by player id, it looks near each
+headquarters and land storehouse and tries to add one alternative land road that
+most improves plain road-network connectivity.
+
+For each headquarters or storehouse, the source set contains:
+
+- the building's front flag,
+- the nearest other owned flag found within radius `10` of that front flag.
+
+Harbor buildings are skipped by this land-road activation. For every source,
+the search checks owned target flags within radius `10`, requires both flags to
+already belong to the land road system, and compares the existing road distance
+against a new free-terrain route. Candidate routes use the same max
+non-flaggable-run limit, road-route BQ penalty, and optional weighted refinement
+as the workload-bypass search.
+
+The score is:
+
+```text
+improvement = oldRoadDistance - (newRoadLength
+              + bqPenalty.roadRoute * routeBQPenalty)
+```
+
+Only positive-improvement candidates are buildable. The activation builds the
+single best candidate, tie-breaking by shorter new road length. This makes the
+pass more conservative than storehouse secondary roads: it does not build the
+first valid loop, and it does not build a longer road merely because it is near
+a warehouse.
 
 ## Waterway Shortcuts
 

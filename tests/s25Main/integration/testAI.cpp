@@ -5,6 +5,7 @@
 #include "PointOutput.h"
 #include "RttrForeachPt.h"
 #include "Ware.h"
+#include "GameCommands.h"
 #include "ai/AIPlayer.h"
 #include "ai/AIQueryService.h"
 #include "ai/aijh/config/AIConfig.h"
@@ -33,6 +34,7 @@
 #include "gameData/MilitaryConsts.h"
 #include "rttr/test/random.hpp"
 #include <boost/test/unit_test.hpp>
+#include <algorithm>
 #include <memory>
 #include <set>
 
@@ -93,6 +95,13 @@ void SetWaterwayTerrain(GameWorld& world, MapPoint pt, const std::vector<Directi
         for(const Direction dir : helpers::EnumRange<Direction>{})
             setRightTerrain(world, pt, dir, water);
     }
+}
+
+std::size_t CountBuildRoadCommands(const std::vector<gc::GameCommandPtr>& commands)
+{
+    return std::count_if(commands.begin(), commands.end(), [](const gc::GameCommandPtr& command) {
+        return dynamic_cast<const gc::BuildRoad*>(command.get()) != nullptr;
+    });
 }
 
 struct WaterwayShortcut
@@ -625,6 +634,75 @@ BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoadBypassingSegment_BuildsShortcutAroun
     commands.front()->Execute(world, curPlayer);
     BOOST_TEST_REQUIRE(sourceFlag->GetRoute(route.front()));
     BOOST_TEST(sourceFlag->GetRoute(route.front()) != hotRoad);
+}
+
+BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoadNearWarehouse_BuildsBestConnectivityShortcut, BiggerWorldWithGCExecution)
+{
+    ScopedRoadRouteBQPenalty disableRoadBQPenalty(0.0);
+    SetAllOwned(world);
+
+    const MapPoint sourceFlagPos = world.GetNeighbour(hqPos, Direction::SouthEast);
+    const std::vector<Direction> longRoute{Direction::SouthEast, Direction::East, Direction::NorthEast,
+                                           Direction::SouthEast, Direction::East, Direction::NorthEast,
+                                           Direction::SouthEast, Direction::East, Direction::NorthEast};
+    const MapPoint targetFlagPos = GetRouteEnd(world, sourceFlagPos, longRoute);
+    this->BuildRoad(sourceFlagPos, false, longRoute);
+
+    const noFlag* sourceFlag = world.GetSpecObj<noFlag>(sourceFlagPos);
+    const noFlag* targetFlag = world.GetSpecObj<noFlag>(targetFlagPos);
+    BOOST_TEST_REQUIRE(sourceFlag);
+    BOOST_TEST_REQUIRE(targetFlag);
+    const RoadSegment* oldRoad = sourceFlag->GetRoute(longRoute.front());
+    BOOST_TEST_REQUIRE(oldRoad);
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    std::vector<Direction> route;
+    BOOST_TEST_REQUIRE(ai.GetConstruction().BuildAlternativeRoadNearWarehouse(route));
+    BOOST_TEST(route.size() < longRoute.size());
+    BOOST_TEST(route.front() != longRoute.front());
+
+    auto commands = ai.FetchGameCommands();
+    BOOST_TEST_REQUIRE(commands.size() == 1u);
+    commands.front()->Execute(world, curPlayer);
+    BOOST_TEST_REQUIRE(sourceFlag->GetRoute(route.front()));
+    BOOST_TEST(sourceFlag->GetRoute(route.front()) != oldRoad);
+}
+
+BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoadNearWarehouse_RejectsWhenNoConnectivityImprovement, WorldWithGCExecution<1>)
+{
+    ScopedRoadRouteBQPenalty disableRoadBQPenalty(0.0);
+
+    const MapPoint sourceFlagPos = world.GetNeighbour(hqPos, Direction::SouthEast);
+    this->BuildRoad(sourceFlagPos, false, std::vector<Direction>(4, Direction::East));
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    std::vector<Direction> route;
+    BOOST_TEST(!ai.GetConstruction().BuildAlternativeRoadNearWarehouse(route));
+    BOOST_TEST(route.empty());
+    BOOST_TEST(ai.FetchGameCommands().empty());
+}
+
+BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoadNearWarehouse_RunGFUses5000GFCadence, BiggerWorldWithGCExecution)
+{
+    ScopedRoadRouteBQPenalty disableRoadBQPenalty(0.0);
+    SetAllOwned(world);
+
+    const MapPoint sourceFlagPos = world.GetNeighbour(hqPos, Direction::SouthEast);
+    const std::vector<Direction> longRoute{Direction::SouthEast, Direction::East, Direction::NorthEast,
+                                           Direction::SouthEast, Direction::East, Direction::NorthEast,
+                                           Direction::SouthEast, Direction::East, Direction::NorthEast};
+    this->BuildRoad(sourceFlagPos, false, longRoute);
+
+    AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
+    for(unsigned gf = 1; gf <= 10; ++gf)
+        ai.RunGF(gf, false);
+    ai.FetchGameCommands();
+
+    ai.RunGF(4999, false);
+    BOOST_TEST(CountBuildRoadCommands(ai.FetchGameCommands()) == 0u);
+
+    ai.RunGF(5000, false);
+    BOOST_TEST(CountBuildRoadCommands(ai.FetchGameCommands()) == 1u);
 }
 
 BOOST_FIXTURE_TEST_CASE(BuildAlternativeWaterRoad_BuildsBeneficialWareShortcut, WaterwayWorldWithGCExecution)

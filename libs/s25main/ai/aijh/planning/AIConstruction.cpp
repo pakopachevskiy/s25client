@@ -340,6 +340,16 @@ namespace {
         std::vector<Direction> route;
     };
 
+    struct WarehouseConnectivityCandidate
+    {
+        const noFlag* start = nullptr;
+        const noFlag* target = nullptr;
+        unsigned oldLength = 0;
+        unsigned newLength = 0;
+        double effectiveNewLength = std::numeric_limits<double>::infinity();
+        std::vector<Direction> route;
+    };
+
     const RoadSegment* FindLandRoadSegmentBetween(const noFlag& lhs, const noFlag& rhs,
                                                   const RoadWorkloadSegment& hotSegment)
     {
@@ -499,7 +509,7 @@ bool AIConstruction::ConnectFlagToRoadSytem(const noFlag* flag, std::vector<Dire
 
         const double refinementScoreLimit =
           bestCandidate.score + bqPenaltyConfig.roadRouteWeightedRefinementScoreMargin;
-        for(size_t idx = 0; idx < candidates.size(); ++idx)
+         for(size_t idx = 0; idx < candidates.size(); ++idx)
         {
             const bool isTopCandidate = idx < bqPenaltyConfig.roadRouteWeightedRefinementTopN;
             if(!isTopCandidate && candidates[idx].score > refinementScoreLimit)
@@ -1019,6 +1029,145 @@ bool AIConstruction::BuildAlternativeRoadBypassingSegment(const RoadWorkloadSegm
             {
                 continue;
             }
+            if(effectiveNewLength >= oldLength)
+                continue;
+
+            const double bestImprovement = bestCandidate.start
+                                             ? bestCandidate.oldLength - bestCandidate.effectiveNewLength
+                                             : -std::numeric_limits<double>::infinity();
+            const double improvement = oldLength - effectiveNewLength;
+            if(!bestCandidate.start || improvement > bestImprovement
+               || (improvement == bestImprovement && newLength < bestCandidate.newLength))
+            {
+                bestCandidate.start = start;
+                bestCandidate.target = target;
+                bestCandidate.oldLength = oldLength;
+                bestCandidate.newLength = newLength;
+                bestCandidate.effectiveNewLength = effectiveNewLength;
+                bestCandidate.route = std::move(routeToBuild);
+            }
+        }
+    }
+
+    if(!bestCandidate.start)
+        return false;
+
+    route = bestCandidate.route;
+    if(BuildRoad(bestCandidate.start, bestCandidate.target, route))
+    {
+        constructionlocations.push_back(bestCandidate.start->GetPos());
+        constructionlocations.push_back(bestCandidate.target->GetPos());
+        return true;
+    }
+    return false;
+}
+
+bool AIConstruction::BuildAlternativeRoadNearWarehouse(std::vector<Direction>& route)
+{
+    route.clear();
+
+    constexpr unsigned short maxSourceFlagSearchRadius = 10;
+    constexpr unsigned short maxTargetFlagSearchRadius = 10;
+    constexpr unsigned maxNewRoadLength = 24;
+
+    std::vector<const noFlag*> sourceFlags;
+    for(const nobBaseWarehouse* warehouse : aii.GetStorehouses())
+    {
+        if(!warehouse
+           || (warehouse->GetBuildingType() != BuildingType::Headquarters
+               && warehouse->GetBuildingType() != BuildingType::Storehouse))
+        {
+            continue;
+        }
+
+        const noFlag* frontFlag = warehouse->GetFlag();
+        if(!frontFlag || frontFlag->GetPlayer() != aii.GetPlayerId())
+            continue;
+
+        sourceFlags.push_back(frontFlag);
+
+        const std::vector<const noFlag*> nearbyFlags = FindFlags(frontFlag->GetPos(), maxSourceFlagSearchRadius);
+        for(const noFlag* nearbyFlag : nearbyFlags)
+        {
+            if(nearbyFlag && nearbyFlag != frontFlag)
+            {
+                sourceFlags.push_back(nearbyFlag);
+                break;
+            }
+        }
+    }
+    helpers::makeUniqueStable(sourceFlags);
+
+    const auto& bqPenaltyConfig = aijh.GetConfig().bqPenalty;
+    const double roadRouteBQPenalty = bqPenaltyConfig.roadRoute;
+    const bool useWeightedRefinement =
+      roadRouteBQPenalty > 0.0 && bqPenaltyConfig.roadRouteWeightedSearch
+      && bqPenaltyConfig.roadRouteWeightedRefinementTopN > 0;
+
+    WarehouseConnectivityCandidate bestCandidate;
+    for(const noFlag* start : sourceFlags)
+    {
+        if(!start || !IsConnectedToRoadSystem(start))
+            continue;
+
+        const std::vector<const noFlag*> targetFlags = FindFlags(start->GetPos(), maxTargetFlagSearchRadius);
+        for(const noFlag* target : targetFlags)
+        {
+            if(!target || start == target || !IsConnectedToRoadSystem(target))
+                continue;
+
+            const unsigned straightDistance = aii.gwb.CalcDistance(start->GetPos(), target->GetPos());
+            if(straightDistance > maxNewRoadLength)
+                continue;
+
+            unsigned oldLength = 0;
+            if(!aii.FindPathOnRoads(*start, *target, &oldLength) || straightDistance >= oldLength)
+                continue;
+
+            std::vector<Direction> candidateRoute;
+            unsigned newLength = 0;
+            if(!aii.FindFreePathForNewRoad(start->GetPos(), target->GetPos(), &candidateRoute, &newLength)
+               || newLength < 2 || newLength > maxNewRoadLength)
+            {
+                continue;
+            }
+
+            unsigned maxNonFlaggableRun = GetMaxNonFlaggableRun(aii, aijh, start->GetPos(), candidateRoute);
+            if(maxNonFlaggableRun > 2)
+                continue;
+
+            const double bqPenalty = (roadRouteBQPenalty > 0.0)
+                                       ? aii.Queries().EstimateRoadRouteBQPenalty(start->GetPos(), candidateRoute,
+                                                                                  bqPenaltyConfig)
+                                       : 0.0;
+            double effectiveNewLength = newLength + roadRouteBQPenalty * bqPenalty;
+            std::vector<Direction> routeToBuild = candidateRoute;
+
+            if(useWeightedRefinement)
+            {
+                std::vector<Direction> weightedRoute;
+                unsigned weightedLength = 0;
+                if(aii.FindWeightedFreePathForNewRoad(start->GetPos(), target->GetPos(), bqPenaltyConfig,
+                                                      &weightedRoute, &weightedLength, false)
+                   && weightedLength >= 2 && weightedLength <= maxNewRoadLength)
+                {
+                    maxNonFlaggableRun = GetMaxNonFlaggableRun(aii, aijh, start->GetPos(), weightedRoute);
+                    if(maxNonFlaggableRun <= 2)
+                    {
+                        const double weightedBQPenalty =
+                          aii.Queries().EstimateRoadRouteBQPenalty(start->GetPos(), weightedRoute, bqPenaltyConfig);
+                        const double weightedEffectiveNewLength =
+                          weightedLength + roadRouteBQPenalty * weightedBQPenalty;
+                        if(weightedEffectiveNewLength < effectiveNewLength)
+                        {
+                            newLength = weightedLength;
+                            effectiveNewLength = weightedEffectiveNewLength;
+                            routeToBuild = std::move(weightedRoute);
+                        }
+                    }
+                }
+            }
+
             if(effectiveNewLength >= oldLength)
                 continue;
 

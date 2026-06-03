@@ -39,8 +39,9 @@
 namespace {
 
 constexpr unsigned kRoadWorkloadBypassIntervalGF = 2500;
-constexpr unsigned kRoadWorkloadBypassThreshold = 40;
+constexpr unsigned kRoadWorkloadBypassThreshold = 30;
 constexpr unsigned kRoadWorkloadBypassFailureCooldownGF = 50000;
+constexpr unsigned kStorehouseConnectivityRoadIntervalGF = 5000;
 
 void HandleBuildingNote(AIEventManager& eventMgr, const BuildingNote& note)
 {
@@ -329,6 +330,12 @@ void AIPlayerJH::RunGF(const unsigned gf, bool gfisnwf)
     {
         const ScopedAIRuntimeProfile roadWorkloadHotspotsProfile(AIRuntimeProfileSection::CheckRoadWorkloadHotspots);
         TryBuildRoadWorkloadBypass();
+    }
+
+    if((gf + playerId * 31) % kStorehouseConnectivityRoadIntervalGF == 0)
+    {
+        std::vector<Direction> route;
+        construction->BuildAlternativeRoadNearWarehouse(route);
     }
 
     if((gf + playerId * 19) % 1000 == 0)

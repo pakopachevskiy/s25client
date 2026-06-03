@@ -160,6 +160,9 @@ building or worker connectivity. Completed AI waterways are kept as single
 segments without automatically added interior flags, and the AI can assign a
 shipyard to replenish a small stored-boat reserve.
 
+The AI can also periodically add land-road shortcuts near headquarters and
+storehouses when a new segment would improve plain road-network connectivity.
+
 ## Road Destruction and Capture
 
 Destroying a flag destroys its connected road segments and removes wares waiting

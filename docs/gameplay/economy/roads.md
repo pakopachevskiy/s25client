@@ -125,6 +125,87 @@ The pathfinder used for ware movement is road-aware:
 Human pathfinding on roads uses the same graph but without those ware-traffic
 penalties.
 
+## Road And Flag Throughput
+
+Carrier throughput is controlled by the `nofCarrier` state machine.
+
+The basic flat walking cost is one road node per `20 GF`. `noFigure` starts
+each walk with `StartMoving(dir, 20)`, and `noMovable::StartMoving()` increases
+that cost for uphill edges:
+
+- flat or downhill: `20 GF`,
+- altitude difference `+1`: `30 GF`,
+- altitude difference `+2` or `+3`: `40 GF`,
+- altitude difference `+4` or `+5`: `60 GF`.
+
+Let `L` be the length of one inter-flag `RoadSegment` in road steps. Assuming a
+flat road, enough wares waiting, enough free flag space, and no blocking by
+other figures, one normal carrier has these approximate capacities:
+
+| Traffic pattern | Service time per delivered ware | Wares per 1000 GF |
+|---|---:|---:|
+| One-way flow, no building entry | `40 * L GF` | `25 / L` |
+| Balanced two-way flow, no empty return | `20 * L GF` | `50 / L` |
+| One-way flow, destination building entry | `40 * (L + 1) GF` | `25 / (L + 1)` |
+| Balanced two-way flow, building entry at both ends | `20 * (L + 2) GF` | `50 / (L + 2)` |
+
+At normal game speed, `1000 GF` is 50 seconds. The values above are therefore
+also easy to convert to wares per real minute by multiplying by `1.2`.
+
+Examples for one normal carrier on a flat road:
+
+| Road length | One-way, no building entry | One-way, destination building entry | Balanced two-way, no building entry | Balanced two-way, both ends enter buildings |
+|---:|---:|---:|---:|---:|
+| `L = 2` | `12.5 / 1000 GF` | `8.33 / 1000 GF` | `25 / 1000 GF` | `12.5 / 1000 GF` |
+| `L = 3` | `8.33 / 1000 GF` | `6.25 / 1000 GF` | `16.67 / 1000 GF` | `10 / 1000 GF` |
+| `L = 4` | `6.25 / 1000 GF` | `5 / 1000 GF` | `12.5 / 1000 GF` | `8.33 / 1000 GF` |
+| `L = 5` | `5 / 1000 GF` | `4.17 / 1000 GF` | `10 / 1000 GF` | `7.14 / 1000 GF` |
+
+Donkey roads can have a normal carrier plus a donkey carrier on the same
+segment. Under sustained backlog this roughly doubles the segment capacity,
+though the two carriers avoid duplicating the same single pending ware.
+
+### Adjacent Building Entry
+
+Every building has a fixed one-step `NorthWest` road from its front flag to the
+building. When a road carrier reaches a flag and the ware's recalculated next
+direction is `NorthWest`, `nofCarrier::WantInBuilding()` makes that same carrier
+walk into the building, deposit the ware, and then walk back out to the flag
+before it can resume road work.
+
+On flat ground this adds:
+
+```text
+20 GF into the building + 20 GF back to the flag = 40 GF per delivered ware
+```
+
+This is relevant for wares delivered into headquarters, warehouses, construction
+sites, military buildings, and ordinary producer buildings. For a producer, it
+applies to input wares delivered into the building. It does not apply to the
+producer's output ware: `nofBuildingWorker::WorkingReady()` creates the output
+at the front flag, and the road carrier starts from that flag.
+
+Warehouse export has another special path. Outgoing warehouse wares are carried
+from the warehouse to the flag and back by a short-lived `nofWarehouseWorker`.
+Incoming wares still use the road carrier's adjacent-building entry path when
+their goal is the warehouse.
+
+### Flag Capacity
+
+A flag is an 8-ware buffer, not an active processor. It does not add a fixed
+service delay. The useful throughput of a flag is therefore the sum of what its
+adjacent road segments and attached building entry can actually move.
+
+The buffer still affects realized capacity:
+
+- if the destination flag is full, a carrier can stop in `WaitForWareSpace`;
+- if the flag is full but a ware is waiting for the opposite direction, the
+  carrier can swap wares and keep moving;
+- balanced two-way traffic is therefore much more efficient than pure one-way
+  traffic on the same segment;
+- once an adjacent building must be entered for every ware, that building-entry
+  detour becomes part of the segment's effective bottleneck.
+
 ## Donkey Roads
 
 Roads do not start as donkey roads. A segment upgrades when its normal carrier
