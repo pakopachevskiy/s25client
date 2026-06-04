@@ -69,7 +69,7 @@ struct WareProductionWindowStats
 
 namespace WareProductionStatsHolder {
 
-constexpr unsigned WINDOW_SIZE_GF = 1000;
+constexpr unsigned WINDOW_SIZE_GF = 5000;
 
 WareConsumptionConsumer ToConsumer(BuildingType buildingType);
 void ReportProduced(unsigned gf, unsigned char playerId, GoodType good, unsigned count = 1);

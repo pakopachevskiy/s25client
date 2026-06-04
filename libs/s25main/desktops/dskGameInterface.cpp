@@ -62,6 +62,7 @@
 #include "ingameWindows/iwTrade.h"
 #include "ingameWindows/iwTransport.h"
 #include "ingameWindows/iwVictory.h"
+#include "ingameWindows/iwWaresFlows.h"
 #include "lua/GameDataLoader.h"
 #include "network/GameClient.h"
 #include "notifications/BuildingNote.h"
@@ -272,6 +273,8 @@ void dskGameInterface::ShowPersistentWindowsAfterSwitch()
           std::make_unique<iwShip>(gwv, GAMECLIENT, gwv.GetViewer().GetPlayer().GetShipByID(0)));
     if(windows[CGI_MERCHANDISE_STATISTICS].isOpen)
         WINDOWMANAGER.ShowAfterSwitch(std::make_unique<iwMerchandiseStatistics>(gwv.GetViewer().GetPlayer()));
+    if(windows[CGI_WARES_FLOWS].isOpen)
+        WINDOWMANAGER.ShowAfterSwitch(std::make_unique<iwWaresFlows>(gwv.GetViewer()));
 }
 
 void dskGameInterface::Resize(const Extent& newSize)

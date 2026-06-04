@@ -8,8 +8,10 @@
 #include "ai/AIEvents.h"
 #include "ai/aijh/debug/AIDebugView.h"
 #include "ai/aijh/planning/Jobs.h"
+#include "controls/ctrlButton.h"
 #include "controls/ctrlComboBox.h"
 #include "controls/ctrlMultiline.h"
+#include "controls/ctrlOptionGroup.h"
 #include "GamePlayer.h"
 #include "helpers/EnumArray.h"
 #include "helpers/EnumRange.h"
@@ -32,17 +34,41 @@
 namespace {
 enum
 {
-    ID_CbPlayer,
+    ID_PlayerGroup,
     ID_CbOverlay,
     ID_CbBuildingType,
     ID_Text
 };
 
+constexpr unsigned ID_PlayerButtonBase = 1000;
 constexpr unsigned OVERLAY_POSITION_RATING = 13;
 constexpr unsigned OVERLAY_BUILDINGS_WANTED = 14;
 constexpr unsigned OVERLAY_INVENTORY = 15;
 constexpr unsigned OVERLAY_ROAD_WORKLOAD = 16;
 constexpr unsigned BUILDINGS_WANTED_DISABLED = std::numeric_limits<unsigned>::max();
+
+std::string GetPlayerStatus(const GamePlayer& player)
+{
+    if(player.IsDefeated())
+        return "---";
+    else if(player.isHuman())
+        return "#" + std::to_string(player.GetPlayerId() + 1);
+    else
+        return _("COMP");
+}
+
+glArchivItem_Bitmap* GetPlayerImage(const Nation nation)
+{
+    switch(nation)
+    {
+        case Nation::Africans: return LOADER.GetImageN("io", 257);
+        case Nation::Japanese: return LOADER.GetImageN("io", 253);
+        case Nation::Romans: return LOADER.GetImageN("io", 252);
+        case Nation::Vikings: return LOADER.GetImageN("io", 256);
+        case Nation::Babylonians: return LOADER.GetImageN("io_new", 7);
+    }
+    return LOADER.GetImageN("io", 252);
+}
 
 std::vector<std::pair<std::string, BuildingType>> GetSortedBuildingTypes()
 {
@@ -149,13 +175,16 @@ public:
 iwAIDebug::iwAIDebug(GameWorldView& gwv, const std::vector<const AIPlayer*>& ais)
     : IngameWindow(CGI_AI_DEBUG, IngameWindow::posLastOrCenter, Extent(280, 515), _("AI Debug"),
                    LOADER.GetImageN("resource", 41)),
-      gwv(gwv), buildingType(nullptr), text(nullptr), printer(nullptr)
+      gwv(gwv), buildingType(nullptr), text(nullptr), printer(nullptr), selectedAIIndex(0)
 {
     for(const AIPlayer* ai : ais)
     {
         const auto* aiDebugView = dynamic_cast<const AIJH::AIDebugView*>(ai);
         if(aiDebugView)
+        {
             ais_.push_back(aiDebugView);
+            aiPlayers_.push_back(ai);
+        }
     }
     // Wenn keine KI-Spieler, schließen
     if(ais_.empty())
@@ -164,15 +193,19 @@ iwAIDebug::iwAIDebug(GameWorldView& gwv, const std::vector<const AIPlayer*>& ais
         return;
     }
 
-    ctrlComboBox* players =
-      AddComboBox(ID_CbPlayer, DrawPoint(15, 30), Extent(250, 20), TextureColor::Grey, NormalFont, 100);
-    for(const AIJH::AIDebugView* ai : ais_)
+    const unsigned short startX = 140 - (aiPlayers_.size() - 1) * 17;
+    ctrlOptionGroup* players = AddOptionGroup(ID_PlayerGroup, GroupSelectType::Illuminate);
+    for(unsigned i = 0; i < aiPlayers_.size(); ++i)
     {
-        players->AddString(ai->GetPlayerName());
+        const GamePlayer& player = aiPlayers_[i]->player;
+        players
+          ->AddImageButton(ID_PlayerButtonBase + i, DrawPoint(startX + i * 34 - 17, 30), Extent(34, 47),
+                           TextureColor::Green1, GetPlayerImage(player.nation), player.name)
+          ->SetBorder(false);
     }
 
     ctrlComboBox* overlays =
-      AddComboBox(ID_CbOverlay, DrawPoint(15, 60), Extent(250, 20), TextureColor::Grey, NormalFont, 100);
+      AddComboBox(ID_CbOverlay, DrawPoint(15, 105), Extent(250, 20), TextureColor::Grey, NormalFont, 100);
     overlays->AddString("None");
     overlays->AddString("BuildingQuality");
     overlays->AddString("Reachability");
@@ -191,7 +224,7 @@ iwAIDebug::iwAIDebug(GameWorldView& gwv, const std::vector<const AIPlayer*>& ais
     overlays->AddString("Inventory");
     overlays->AddString("Road Workload");
 
-    buildingType = AddComboBox(ID_CbBuildingType, DrawPoint(15, 90), Extent(250, 20), TextureColor::Grey, NormalFont,
+    buildingType = AddComboBox(ID_CbBuildingType, DrawPoint(15, 135), Extent(250, 20), TextureColor::Grey, NormalFont,
                                100);
     for(const auto& type : GetSortedBuildingTypes())
         buildingType->AddString(type.first);
@@ -199,12 +232,12 @@ iwAIDebug::iwAIDebug(GameWorldView& gwv, const std::vector<const AIPlayer*>& ais
     buildingType->SetVisible(false);
 
     // Show 15 lines of text and 1 empty line
-    text = AddMultiline(ID_Text, DrawPoint(15, 120), Extent(250, 16 * NormalFont->getHeight()), TextureColor::Grey,
+    text = AddMultiline(ID_Text, DrawPoint(15, 135), Extent(250, 16 * NormalFont->getHeight()), TextureColor::Grey,
                         NormalFont, FontStyle::NO_OUTLINE);
 
     SetIwSize(Extent(GetIwSize().x, text->GetPos().y + text->GetSize().y));
 
-    players->SetSelection(0);
+    players->SetSelection(ID_PlayerButtonBase);
     overlays->SetSelection(0);
     printer = new DebugPrinter(ais_[0], 0);
     gwv.AddDrawNodeCallback(printer);
@@ -219,17 +252,52 @@ iwAIDebug::~iwAIDebug()
     }
 }
 
+void iwAIDebug::Draw_()
+{
+    IngameWindow::Draw_();
+
+    if(IsMinimized())
+        return;
+
+    DrawPlayerSelection();
+}
+
 void iwAIDebug::Msg_ComboSelectItem(const unsigned ctrl_id, const unsigned selection)
 {
     switch(ctrl_id)
     {
-        case ID_CbPlayer: printer->ai = ais_[selection]; break;
         case ID_CbOverlay:
             printer->overlay = selection;
             buildingType->SetVisible(selection == OVERLAY_POSITION_RATING);
+            text->SetPos(DrawPoint(15, selection == OVERLAY_POSITION_RATING ? 165 : 135));
+            SetIwSize(Extent(GetIwSize().x, text->GetPos().y + text->GetSize().y));
             break;
         case ID_CbBuildingType: printer->buildingType = GetBuildingTypeFromSelection(selection); break;
     }
+}
+
+void iwAIDebug::Msg_OptionGroupChange(const unsigned ctrl_id, const unsigned selection)
+{
+    switch(ctrl_id)
+    {
+        case ID_PlayerGroup:
+            selectedAIIndex = selection - ID_PlayerButtonBase;
+            printer->ai = ais_[selectedAIIndex];
+            break;
+    }
+}
+
+void iwAIDebug::DrawPlayerSelection()
+{
+    const unsigned short startX = 140 - (aiPlayers_.size() - 1) * 17;
+    const GamePlayer& player = aiPlayers_[selectedAIIndex]->player;
+    const DrawPoint drawPt = GetDrawPos() + DrawPoint(startX + selectedAIIndex * 34 - 17, 30);
+    const Rect playerBoxRect(DrawPoint(drawPt.x, drawPt.y + 47), Extent(34, 12));
+    const DrawPoint playerStatusPosition =
+      DrawPoint(playerBoxRect.getOrigin() + playerBoxRect.getSize() / 2 + DrawPoint(0, 1));
+    DrawRectangle(playerBoxRect, player.color);
+    SmallFont->Draw(playerStatusPosition, GetPlayerStatus(player), FontStyle::CENTER | FontStyle::VCENTER,
+                    COLOR_YELLOW);
 }
 
 void iwAIDebug::Msg_PaintBefore()

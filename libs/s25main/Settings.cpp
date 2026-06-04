@@ -43,7 +43,8 @@ const std::map<GUI_ID, std::string> persistentWindows = {{CGI_CHAT, "wnd_chat"},
                                                          {CGI_ECONOMICPROGRESS, "wnd_economicprogress"},
                                                          {CGI_DIPLOMACY, "wnd_diplomacy"},
                                                          {CGI_SHIP, "wnd_ship"},
-                                                         {CGI_MERCHANDISE_STATISTICS, "wnd_merchandise_statistics"}};
+                                                         {CGI_MERCHANDISE_STATISTICS, "wnd_merchandise_statistics"},
+                                                         {CGI_WARES_FLOWS, "wnd_wares_flows"}};
 
 namespace validate {
 boost::optional<uint16_t> checkPort(const std::string& port)

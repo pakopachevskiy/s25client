@@ -9,11 +9,11 @@ ctrlOptionGroup::ctrlOptionGroup(Window* parent, unsigned id, GroupSelectType se
 {}
 
 /**
- *  wählt einen Button aus der Gruppe aus.
+ *  Selects a button from the group.
  */
 void ctrlOptionGroup::SetSelection(unsigned selection, bool notify)
 {
-    // Aktuellen ausgewählten Button wieder normal machen
+    // Reset the currently selected button
     if(this->selection_)
     {
         auto* button = GetCtrl<ctrlButton>(this->selection_.get());
@@ -26,7 +26,7 @@ void ctrlOptionGroup::SetSelection(unsigned selection, bool notify)
         }
     }
 
-    // Neuen Button auswählen
+    // Select the new button
     auto* button = GetCtrl<ctrlButton>(selection);
     RTTR_Assert(button);
     switch(select_type)

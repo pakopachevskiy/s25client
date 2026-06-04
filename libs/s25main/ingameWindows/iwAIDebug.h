@@ -23,15 +23,20 @@ public:
 
 private:
     void Msg_ComboSelectItem(unsigned ctrl_id, unsigned selection) override;
+    void Msg_OptionGroupChange(unsigned ctrl_id, unsigned selection) override;
     // void Msg_ButtonClick(unsigned ctrl_id);
     // void Msg_ProgressChange(unsigned ctrl_id, unsigned short position);
+    void Draw_() override;
     void Msg_PaintBefore() override;
+    void DrawPlayerSelection();
 
     class DebugPrinter;
 
     GameWorldView& gwv;
     std::vector<const AIJH::AIDebugView*> ais_;
+    std::vector<const AIPlayer*> aiPlayers_;
     ctrlComboBox* buildingType;
     ctrlMultiline* text;
     DebugPrinter* printer;
+    unsigned selectedAIIndex;
 };
