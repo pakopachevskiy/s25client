@@ -42,7 +42,7 @@ iwStatistics::iwStatistics(const GameWorldViewer& gwv)
 {
     activePlayers = std::vector<bool>(MAX_PLAYERS);
 
-    // Spieler zählen
+    // Count players
     numPlayingPlayers = 0;
     const GameWorldBase& world = gwv.GetWorld();
     for(unsigned i = 0; i < world.GetNumPlayers(); ++i)
@@ -51,13 +51,13 @@ iwStatistics::iwStatistics(const GameWorldViewer& gwv)
             numPlayingPlayers++;
     }
 
-    // Bilder für die spielenden Spieler malen (nur vier in Gebrauch, da kein einzelner Anführer auswählbar)
+    // Draw images for the active players (only four in use, since no single leader can be selected)
     unsigned short startX = 126 - (numPlayingPlayers - 1) * 17;
     unsigned pos = 0;
 
     for(unsigned i = 0; i < world.GetNumPlayers(); ++i)
     {
-        // nicht belegte Spielplätze rauswerfen
+        // Skip unused player slots
         const GamePlayer& curPlayer = world.GetPlayer(i);
         if(!curPlayer.isUsed())
             continue;
@@ -91,23 +91,23 @@ iwStatistics::iwStatistics(const GameWorldViewer& gwv)
                 break;
         }
 
-        // Statistik-Sichtbarkeit abhängig von Auswahl
+        // Set statistics visibility depending on the selection
         switch(GAMECLIENT.IsReplayModeOn() ? 0 : world.GetGGS().getSelection(AddonId::STATISTICS_VISIBILITY))
         {
-            default: // Passiert eh nicht, nur zur Sicherheit
+            default: // Should not happen, safety only
                 activePlayers[i] = false;
                 break;
-            case 0: // Alle sehen alles
+            case 0: // Everyone sees everything
                 activePlayers[i] = true;
                 break;
-            case 1: // Nur Verbündete teilen Sicht
+            case 1: // Only allies share visibility
             {
                 const bool visible = gwv.GetPlayer().IsAlly(i);
                 activePlayers[i] = visible;
                 GetCtrl<ctrlButton>(1 + i)->SetEnabled(visible);
             }
             break;
-            case 2: // Nur man selber
+            case 2: // Only the player themselves
             {
                 const bool visible = (gwv.GetPlayerId() == i);
                 activePlayers[i] = visible;
@@ -119,10 +119,10 @@ iwStatistics::iwStatistics(const GameWorldViewer& gwv)
         pos++;
     }
 
-    // Statistikfeld
+    // Statistics field
     AddImage(10, DrawPoint(11 + 115, 84 + 81), LOADER.GetImageN("io", 228));
 
-    // Die Buttons zum Wechseln der Statistiken
+    // Buttons for switching statistics
     ctrlOptionGroup* statChanger = AddOptionGroup(19, GroupSelectType::Illuminate);
     statChanger->AddImageButton(11, DrawPoint(18, 250), Extent(26, 30), TextureColor::Grey, LOADER.GetImageN("io", 167),
                                 _("Size of country"));
@@ -141,38 +141,38 @@ iwStatistics::iwStatistics(const GameWorldViewer& gwv)
     statChanger->AddImageButton(18, DrawPoint(207, 250), Extent(26, 30), TextureColor::Grey,
                                 LOADER.GetImageN("io", 217), _("Vanquished enemies"));
 
-    // Zeit-Buttons
+    // Time buttons
     ctrlOptionGroup* timeChanger = AddOptionGroup(20, GroupSelectType::Illuminate);
     timeChanger->AddTextButton(21, DrawPoint(51, 288), Extent(43, 28), TextureColor::Grey, _("15 m"), NormalFont);
     timeChanger->AddTextButton(22, DrawPoint(96, 288), Extent(43, 28), TextureColor::Grey, _("1 h"), NormalFont);
     timeChanger->AddTextButton(23, DrawPoint(141, 288), Extent(43, 28), TextureColor::Grey, _("4 h"), NormalFont);
     timeChanger->AddTextButton(24, DrawPoint(186, 288), Extent(43, 28), TextureColor::Grey, _("16 h"), NormalFont);
 
-    // Hilfe-Button
+    // Help button
     AddImageButton(25, DrawPoint(18, 288), Extent(30, 32), TextureColor::Grey, LOADER.GetImageN("io", 225), _("Help"));
 
-    // Aktuelle Überschrift über der Statistik
+    // Current heading above the statistics
     headline = AddText(30, DrawPoint(130, 120), _("Size of country"), MakeColor(255, 136, 96, 52),
                        FontStyle::CENTER | FontStyle::BOTTOM | FontStyle::NO_OUTLINE,
                        NormalFont); // qx: fix for bug #1106952
 
-    // Aktueller Maximalwert an der y-Achse
+    // Current maximum value on the y-axis
     maxValue = AddText(31, DrawPoint(211, 125), "1", MakeColor(255, 136, 96, 52),
                        FontStyle::RIGHT | FontStyle::VCENTER | FontStyle::NO_OUTLINE, NormalFont);
 
-    // Aktueller Minimalwert an der y-Achse
+    // Current minimum value on the y-axis
     minValue = AddText(40, DrawPoint(211, 200), "0", MakeColor(255, 136, 96, 52),
                        FontStyle::RIGHT | FontStyle::VCENTER | FontStyle::NO_OUTLINE, NormalFont);
 
-    // Zeit-Werte an der x-Achse
-    timeAnnotations = std::vector<ctrlText*>(7); // TODO nach oben
+    // Time values on the x-axis
+    timeAnnotations = std::vector<ctrlText*>(7); // TODO move up
     for(unsigned i = 0; i < 7; ++i)
     {
         timeAnnotations[i] = AddText(32 + i, DrawPoint(211 + i, 125 + i), "", MakeColor(255, 136, 96, 52),
                                      FontStyle::CENTER | FontStyle::TOP | FontStyle::NO_OUTLINE, NormalFont);
     }
 
-    // Standardansicht: 15min / Landesgröße
+    // Default view: 15 min / country size
     statChanger->SetSelection(11);
     currentView = StatisticType::Country;
     timeChanger->SetSelection(21);
@@ -194,10 +194,10 @@ void iwStatistics::Msg_ButtonClick(const unsigned ctrl_id)
         case 4:
         case 5:
         case 6:
-        case 7: // Spielerportraits
+        case 7: // Player portraits
             activePlayers[ctrl_id - 1] = !activePlayers[ctrl_id - 1];
             break;
-        case 25: // Hilfe
+        case 25: // Help
         {
             WINDOWMANAGER.ReplaceWindow(
               std::make_unique<iwHelp>(_("This window allows a direct comparison with the enemies. "
@@ -213,7 +213,7 @@ void iwStatistics::Msg_OptionGroupChange(const unsigned ctrl_id, const unsigned 
 {
     switch(ctrl_id)
     {
-        case 19: // Statistikart wählen
+        case 19: // Select statistics type
             switch(selection)
             {
                 case 11:
@@ -250,7 +250,7 @@ void iwStatistics::Msg_OptionGroupChange(const unsigned ctrl_id, const unsigned 
                     break;
             }
             break;
-        case 20: // Zeitbereich wählen
+        case 20: // Select time range
             switch(selection)
             {
                 case 21: currentTime = StatisticTime::T15Minutes; break;
@@ -272,10 +272,10 @@ void iwStatistics::Draw_()
     // Draw the alliances and the colored boxes under the portraits
     DrawPlayerOverlays();
 
-    // Koordinatenachsen malen
+    // Draw coordinate axes
     DrawAxis();
 
-    // Statistiklinien malen
+    // Draw statistics lines
     DrawStatistic(currentView);
 }
 
@@ -328,7 +328,7 @@ void iwStatistics::DrawPlayerAlliances(DrawPoint const& drawPt, const GamePlayer
 
 void iwStatistics::DrawStatistic(StatisticType type)
 {
-    // Ein paar benötigte Werte...
+    // Some required values...
     const Extent size(180, 80);
     const int stepX = size.x / NUM_STAT_STEPS;
 
@@ -336,7 +336,7 @@ void iwStatistics::DrawStatistic(StatisticType type)
     unsigned max = 1;
     unsigned min = 65000;
 
-    // Maximal- und Minimalwert suchen
+    // Find maximum and minimum values
     const GameWorldBase& world = gwv.GetWorld();
     for(unsigned p = 0; p < world.GetNumPlayers(); ++p)
     {
@@ -364,12 +364,12 @@ void iwStatistics::DrawStatistic(StatisticType type)
         --min;
         ++max;
     }
-    // Maximalen/Minimalen Wert an die Achse schreiben
+    // Write maximum/minimum value to the axis
     maxValue->SetText(std::to_string(max));
     if(SETTINGS.ingame.scale_statistics)
         minValue->SetText(std::to_string(min));
 
-    // Statistiklinien zeichnen
+    // Draw statistics lines
     const DrawPoint topLeft = GetPos() + DrawPoint(34, 124);
     DrawPoint previousPos(0, 0);
 

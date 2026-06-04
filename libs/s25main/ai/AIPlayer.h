@@ -7,6 +7,8 @@
 #include "AIInterface.h"
 #include "GameCommand.h"
 #include "gameTypes/ChatDestination.h"
+#include "gameTypes/BuildingType.h"
+#include <boost/optional/optional.hpp>
 
 class GameWorldBase;
 class GamePlayer;
@@ -44,6 +46,7 @@ public:
     AIInterface& getAIInterface() { return aii; }
 
     virtual void saveStats(unsigned /*gf*/) const {}
+    virtual boost::optional<unsigned> GetNumBuildingsWanted(BuildingType /*type*/) const { return boost::none; }
 
     /// Own player ID that the AI should know, e.g. when exploring the map
     const unsigned char playerId;

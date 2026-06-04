@@ -25,6 +25,7 @@
 #include "s25util/colors.h"
 #include <algorithm>
 #include <array>
+#include <boost/optional/optional.hpp>
 #include <limits>
 #include <optional>
 #include <sstream>
@@ -314,11 +315,13 @@ void iwAIDebug::Msg_PaintBefore()
             if(BUILDING_SIZE[type] == BuildingQuality::Nothing)
                 continue;
 
-            const unsigned wanted = printer->ai->GetNumBuildingsWanted(type);
-            if(wanted == BUILDINGS_WANTED_DISABLED)
+            const boost::optional<unsigned> wanted = printer->ai->GetNumBuildingsWanted(type);
+            if(!wanted)
+                continue;
+            if(*wanted == BUILDINGS_WANTED_DISABLED)
                 continue;
 
-            wantedBuildings.emplace_back(BUILDING_NAMES[type], wanted);
+            wantedBuildings.emplace_back(BUILDING_NAMES[type], *wanted);
         }
         std::sort(wantedBuildings.begin(), wantedBuildings.end(),
                   [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });

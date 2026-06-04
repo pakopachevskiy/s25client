@@ -7,6 +7,7 @@
 #include "GamePlayer.h"
 #include "GlobalGameSettings.h"
 #include "Loader.h"
+#include "WareDemandStatsHolder.h"
 #include "WareProductionStatsHolder.h"
 #include "addons/const_addons.h"
 #include "controls/ctrlButton.h"
@@ -15,6 +16,7 @@
 #include "gameData/ShieldConsts.h"
 #include "gameData/ToolConsts.h"
 #include "gameData/const_gui_ids.h"
+#include "gameTypes/Inventory.h"
 #include "mygettext/mygettext.h"
 #include "network/GameClient.h"
 #include "ogl/FontStyle.h"
@@ -106,11 +108,31 @@ uint64_t SumGoods(const helpers::EnumArray<uint32_t, GoodType>& values, const st
     return sum;
 }
 
-std::string FormatSigned(const int64_t value)
+uint64_t SumInventoryGoods(const Inventory& inventory, const std::vector<GoodType>& goods)
 {
-    if(value > 0)
-        return "+" + std::to_string(value);
-    return std::to_string(value);
+    uint64_t sum = 0;
+    for(const GoodType good : goods)
+    {
+        if(good == GoodType::ShieldRomans)
+        {
+            sum += inventory[GoodType::ShieldRomans];
+            sum += inventory[GoodType::ShieldVikings];
+            sum += inventory[GoodType::ShieldAfricans];
+            sum += inventory[GoodType::ShieldJapanese];
+        } else
+            sum += inventory[good];
+    }
+    return sum;
+}
+
+bool IsDemandCalculated(const WareDemandSnapshot& demand, const std::vector<GoodType>& goods)
+{
+    for(const GoodType good : goods)
+    {
+        if(demand.calculated[ConvertShields(good)])
+            return true;
+    }
+    return false;
 }
 
 std::string TrimPlayerName(const std::string& name)
@@ -123,7 +145,7 @@ std::string TrimPlayerName(const std::string& name)
 } // namespace
 
 iwWaresFlows::iwWaresFlows(const GameWorldViewer& gwv)
-    : IngameWindow(CGI_WARES_FLOWS, IngameWindow::posLastOrCenter, Extent(252, 278), _("Wares Flows"),
+    : IngameWindow(CGI_WARES_FLOWS, IngameWindow::posLastOrCenter, Extent(252, 304), _("Wares Flows"),
                    LOADER.GetImageN("resource", 41)),
       gwv(gwv), text(nullptr), selectedPlayerId(gwv.GetPlayerId()), selectedWareId(categories.front().id),
       currentWindowIndex(std::numeric_limits<unsigned>::max()), numPlayingPlayers(0)
@@ -176,38 +198,38 @@ iwWaresFlows::iwWaresFlows(const GameWorldViewer& gwv)
     }
     players->SetSelection(ID_PlayerButtonBase + selectedPlayerId);
 
-    text = AddMultiline(ID_Text, DrawPoint(17, 88), Extent(218, 96), TextureColor::Grey, NormalFont);
+    text = AddMultiline(ID_Text, DrawPoint(17, 88), Extent(218, 122), TextureColor::Grey, NormalFont);
     text->SetScrollBarAllowed(false);
 
     ctrlOptionGroup* types = AddOptionGroup(ID_WareGroup, GroupSelectType::Illuminate);
-    types->AddImageButton(1, DrawPoint(17, 192), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Wood),
+    types->AddImageButton(1, DrawPoint(17, 218), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Wood),
                           _("Wood"));
-    types->AddImageButton(2, DrawPoint(48, 192), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(2, DrawPoint(48, 218), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Boards), _("Boards"));
-    types->AddImageButton(3, DrawPoint(79, 192), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(3, DrawPoint(79, 218), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Stones), _("Stones"));
-    types->AddImageButton(4, DrawPoint(110, 192), Extent(30, 30), TextureColor::Grey, LOADER.GetImageN("io", 80),
+    types->AddImageButton(4, DrawPoint(110, 218), Extent(30, 30), TextureColor::Grey, LOADER.GetImageN("io", 80),
                           _("Food"));
-    types->AddImageButton(5, DrawPoint(141, 192), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(5, DrawPoint(141, 218), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Water), _("Water"));
-    types->AddImageButton(6, DrawPoint(172, 192), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Beer),
+    types->AddImageButton(6, DrawPoint(172, 218), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Beer),
                           _("Beer"));
-    types->AddImageButton(7, DrawPoint(203, 192), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Coal),
+    types->AddImageButton(7, DrawPoint(203, 218), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Coal),
                           _("Coal"));
 
-    types->AddImageButton(8, DrawPoint(17, 227), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(8, DrawPoint(17, 253), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::IronOre), _("Ironore"));
-    types->AddImageButton(9, DrawPoint(48, 227), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Gold),
+    types->AddImageButton(9, DrawPoint(48, 253), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Gold),
                           _("Gold"));
-    types->AddImageButton(10, DrawPoint(79, 227), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(10, DrawPoint(79, 253), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Iron), _("Iron"));
-    types->AddImageButton(11, DrawPoint(110, 227), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(11, DrawPoint(110, 253), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Coins), _("Coins"));
-    types->AddImageButton(12, DrawPoint(141, 227), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(12, DrawPoint(141, 253), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Hammer), _("Tools"));
-    types->AddImageButton(13, DrawPoint(172, 227), Extent(30, 30), TextureColor::Grey, LOADER.GetImageN("io", 111),
+    types->AddImageButton(13, DrawPoint(172, 253), Extent(30, 30), TextureColor::Grey, LOADER.GetImageN("io", 111),
                           _("Weapons"));
-    types->AddImageButton(14, DrawPoint(203, 227), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(14, DrawPoint(203, 253), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Boat), _("Boats"));
     types->SetSelection(selectedWareId);
 
@@ -279,8 +301,15 @@ void iwWaresFlows::UpdateText()
     const WareFlowCategory& category = GetCategory(selectedWareId);
     const WareProductionWindowStats& stats =
       WareProductionStatsHolder::GetPreviousWindowStats(static_cast<unsigned char>(selectedPlayerId), currentGf);
+    const WareDemandSnapshot& demand =
+      WareDemandStatsHolder::GetCurrentDemand(gwv.GetWorld(), static_cast<unsigned char>(selectedPlayerId), currentGf,
+                                              GAMECLIENT.GetAIPlayer(selectedPlayerId));
     const uint64_t produced = SumGoods(stats.produced, category.goods);
     const uint64_t consumed = SumGoods(stats.consumed, category.goods);
+    const uint64_t currentDemand = SumGoods(demand.demand, category.goods);
+    const uint64_t stockpile =
+      SumInventoryGoods(gwv.GetWorld().GetPlayer(selectedPlayerId).GetInventory(), category.goods);
+    const bool demandCalculated = IsDemandCalculated(demand, category.goods);
 
     std::stringstream ss;
     ss << _("Player") << ": " << TrimPlayerName(gwv.GetWorld().GetPlayer(selectedPlayerId).name) << '\n';
@@ -295,7 +324,8 @@ void iwWaresFlows::UpdateText()
     ss << _("Ware") << ": " << _(category.name) << '\n';
     ss << _("Produced") << ": " << produced << '\n';
     ss << _("Consumed") << ": " << consumed << '\n';
-    ss << _("Net") << ": " << FormatSigned(static_cast<int64_t>(produced) - static_cast<int64_t>(consumed));
+    ss << _("Demand") << ": " << (demandCalculated ? std::to_string(currentDemand) : "-") << '\n';
+    ss << _("Stockpile") << ": " << stockpile;
 
     const std::string content = ss.str();
     if(content == currentText)

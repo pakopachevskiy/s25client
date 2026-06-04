@@ -111,7 +111,7 @@ public:
     Node& GetAINode(MapPoint pt);
     const Node& GetAINode(MapPoint pt) const;
     std::optional<int> GetPointRating(BuildingType type, MapPoint pt) const override;
-    unsigned GetNumBuildingsWanted(BuildingType type) const override;
+    boost::optional<unsigned> GetNumBuildingsWanted(BuildingType type) const override;
     std::optional<unsigned> GetRoadWorkload(MapPoint pt) const override;
 
     unsigned GetNumPlannedConnectedInlandMilitaryBlds()

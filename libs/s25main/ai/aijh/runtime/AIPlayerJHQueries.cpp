@@ -86,7 +86,7 @@ std::optional<int> AIPlayerJH::GetPointRating(const BuildingType type, const Map
     return globalPositionFinder->GetPointRating(type, pt);
 }
 
-unsigned AIPlayerJH::GetNumBuildingsWanted(const BuildingType type) const
+boost::optional<unsigned> AIPlayerJH::GetNumBuildingsWanted(const BuildingType type) const
 {
     return bldPlanner->GetNumBuildingsWanted(type);
 }
