@@ -12,23 +12,32 @@
 class GameCommandFactory;
 class GameWorldView;
 
-/// Fenster, welches die Anzahl aller Gebäude und der Baustellen auflistet
+/// Window listing all buildings and building sites
 class iwBuildings : public IngameWindow
 {
     GameWorldView& gwv;
     GameCommandFactory& gcFactory;
+    unsigned selectedPlayerId;
+    unsigned numPlayingPlayers;
 
 public:
     iwBuildings(GameWorldView& gwv, GameCommandFactory& gcFactory);
 
 private:
-    /// Anzahlen der Gebäude zeichnen
+    /// Draw the building counts
     void Msg_PaintAfter() override;
 
+    void Draw_() override;
     void Msg_ButtonClick(unsigned ctrl_id) override;
+    void Msg_OptionGroupChange(unsigned ctrl_id, unsigned selection) override;
     template<class T_Window, class T_Building>
     void GoToFirstMatching(BuildingType bldType, const std::list<T_Building*>& blds);
 
     void setBuildingOrder();
+    bool IsPlayerSelectionEnabled() const;
+    Extent GetBuildingContentOffset() const;
+    void AddPlayerSelection();
+    void DrawPlayerSelection();
+    void UpdateBuildingIcons();
     std::vector<BuildingType> bts;
 };
