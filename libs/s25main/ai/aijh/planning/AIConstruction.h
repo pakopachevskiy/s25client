@@ -95,6 +95,7 @@ public:
     noFlag* FindTargetStoreHouseFlag(MapPoint pt) const;
 
     bool CanStillConstructHere(MapPoint pt) const;
+    bool HasConstructionMaterialShortage(BuildingType candidate) const;
     unsigned GetNumMilitaryConstructionOrders() const;
 
     void ExecuteJobs(unsigned limit);

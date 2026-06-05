@@ -104,6 +104,11 @@ void BuildJob::TryToBuild()
         return;
     }
 
+    if(aiConstruction.HasConstructionMaterialShortage(type))
+    {
+        return;
+    }
+
     MapPoint foundPos = MapPoint::Invalid();
     if(searchMode == SearchMode::Global)
     {

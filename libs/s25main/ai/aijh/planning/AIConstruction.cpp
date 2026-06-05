@@ -4,11 +4,13 @@
 
 #include "AIConstruction.h"
 #include "BuildingPlanner.h"
+#include "ConstructionSupplementTracker.h"
 #include "EventManager.h"
 #include "FindWhConditions.h"
 #include "GlobalGameSettings.h"
 #include "Jobs.h"
 #include "Point.h"
+#include "WareProductionStatsHolder.h"
 #include "addons/const_addons.h"
 #include "ai/AIInterface.h"
 #include "ai/aijh/RoadWorkloadSegment.h"
@@ -46,6 +48,7 @@ AIConstruction::AIConstruction(AIPlanningContext& aijh)
     : aijh(aijh), aii(aijh.GetInterface()), bldPlanner(aijh.GetBldPlanner())
 {
     std::fill(constructionorders.begin(), constructionorders.end(), 0u);
+    ConstructionSupplementTrackerHolder::Rebuild(aijh.GetPlayerId(), aii.GetBuildingSites());
 }
 
 AIConstruction::~AIConstruction() = default;
@@ -244,6 +247,16 @@ bool AIConstruction::CanStillConstructHere(const MapPoint pt) const
             return false;
     }
     return true;
+}
+
+bool AIConstruction::HasConstructionMaterialShortage(const BuildingType candidate) const
+{
+    const unsigned char playerId = aijh.GetPlayerId();
+    const unsigned currentGF = aijh.GetWorld().GetEvMgr().GetCurrentGF();
+    const WareProductionWindowStats& productionStats =
+      WareProductionStatsHolder::GetPreviousWindowStats(playerId, currentGF);
+    return ConstructionSupplementTrackerHolder::GetConst(playerId).WouldHaveMaterialShortage(
+      candidate, aijh.GetPlayer().GetInventory(), productionStats);
 }
 
 void AIConstruction::ConstructionOrdered(const BuildJob& job)

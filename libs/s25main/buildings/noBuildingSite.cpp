@@ -4,6 +4,7 @@
 
 #include "buildings/noBuildingSite.h"
 #include "BuildingEventLogger.h"
+#include "ConstructionSupplementTracker.h"
 #include "EventManager.h"
 #include "FOWObjects.h"
 #include "GamePlayer.h"
@@ -312,6 +313,7 @@ void noBuildingSite::AddWare(std::unique_ptr<Ware> ware)
         ++boards;
         BuildingEventLogger::LogBoardDeliver(world->GetEvMgr().GetCurrentGF(), player, bldType_, GetObjId(), pos.x,
                                              pos.y);
+        ConstructionSupplementTrackerHolder::ReportWareDelivered(player, GoodType::Boards);
     } else if(ware->type == GoodType::Stones)
     {
         RTTR_Assert(helpers::contains(ordered_stones, ware.get()));
@@ -319,6 +321,7 @@ void noBuildingSite::AddWare(std::unique_ptr<Ware> ware)
         ++stones;
         BuildingEventLogger::LogStoneDeliver(world->GetEvMgr().GetCurrentGF(), player, bldType_, GetObjId(), pos.x,
                                              pos.y);
+        ConstructionSupplementTrackerHolder::ReportWareDelivered(player, GoodType::Stones);
     } else
         throw std::logic_error("Wrong ware type " + helpers::toString(ware->type));
 

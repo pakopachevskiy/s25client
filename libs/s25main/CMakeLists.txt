@@ -52,6 +52,8 @@ set(s25Main_SRCS
         BuildingEventLogger.cpp
         CombatEventLogger.cpp
         CombatLossTracker.cpp
+        ConstructionSupplementTracker.cpp
+        ConstructionSupplementTracker.h
         CountryEventLogger.cpp
         CountryPlotEventLogger.cpp
         EnvironmentEventLogger.cpp

@@ -5,6 +5,7 @@
 #include "GamePlayer.h"
 #include "BuildingEventLogger.h"
 #include "Cheats.h"
+#include "ConstructionSupplementTracker.h"
 #include "ai/aijh/config/AIConfig.h"
 #include "EventManager.h"
 #include "FindWhConditions.h"
@@ -418,9 +419,15 @@ void GamePlayer::AddBuildingSite(noBuildingSite* bldSite)
 {
     RTTR_Assert(bldSite->GetPlayer() == GetPlayerId());
     const MapPoint pos = bldSite->GetPos();
+    const auto playerId = static_cast<unsigned char>(GetPlayerId());
+    ConstructionSupplementTrackerHolder::ReportConstructionSiteCreated(playerId, bldSite->GetBuildingType());
+    ConstructionSupplementTrackerHolder::ReportWareDelivered(playerId, GoodType::Boards,
+                                                             bldSite->getBoards() + bldSite->getUsedBoards());
+    ConstructionSupplementTrackerHolder::ReportWareDelivered(playerId, GoodType::Stones,
+                                                             bldSite->getStones() + bldSite->getUsedStones());
     BuildingEventLogger::LogConstructionSiteCreated(world.GetEvMgr().GetCurrentGF(),
-                                                    static_cast<unsigned char>(GetPlayerId()),
-                                                    bldSite->GetBuildingType(), bldSite->GetObjId(), pos.x, pos.y);
+                                                    playerId, bldSite->GetBuildingType(), bldSite->GetObjId(), pos.x,
+                                                    pos.y);
     buildings.Add(bldSite);
 }
 
@@ -428,10 +435,13 @@ void GamePlayer::RemoveBuildingSite(noBuildingSite* bldSite)
 {
     RTTR_Assert(bldSite->GetPlayer() == GetPlayerId());
     const MapPoint pos = bldSite->GetPos();
+    const auto playerId = static_cast<unsigned char>(GetPlayerId());
+    ConstructionSupplementTrackerHolder::ReportConstructionSiteDestroyed(
+      playerId, bldSite->GetBuildingType(), bldSite->getBoards() + bldSite->getUsedBoards(),
+      bldSite->getStones() + bldSite->getUsedStones());
     BuildingEventLogger::LogConstructionSiteCancelled(world.GetEvMgr().GetCurrentGF(),
-                                                      static_cast<unsigned char>(GetPlayerId()),
-                                                      bldSite->GetBuildingType(), bldSite->GetObjId(), pos.x, pos.y,
-                                                      bldSite);
+                                                      playerId, bldSite->GetBuildingType(), bldSite->GetObjId(), pos.x,
+                                                      pos.y, bldSite);
     buildings.Remove(bldSite);
 }
 
