@@ -66,4 +66,28 @@ BOOST_AUTO_TEST_CASE(ProductionBuildingsAreNobUsual)
     }
 }
 
+BOOST_AUTO_TEST_CASE(FarmhandWorkRadiusMatchesWorkerSearch)
+{
+    BOOST_TEST(GetFarmhandWorkRadius(Job::Carpenter) == 0u);
+    BOOST_TEST(GetFarmhandWorkRadius(Job::Hunter) == 2u);
+    BOOST_TEST(GetFarmhandWorkRadius(Job::Farmer) == 2u);
+    BOOST_TEST(GetFarmhandWorkRadius(Job::Winegrower) == 2u);
+    BOOST_TEST(GetFarmhandWorkRadius(Job::CharBurner) == 3u);
+    BOOST_TEST(GetFarmhandWorkRadius(Job::Woodcutter) == 6u);
+    BOOST_TEST(GetFarmhandWorkRadius(Job::Forester) == 6u);
+    BOOST_TEST(GetFarmhandWorkRadius(Job::Fisher) == 7u);
+    BOOST_TEST(GetFarmhandWorkRadius(Job::Stonemason) == 8u);
+    BOOST_TEST(GetFarmhandWorkRadius(Job::Baker) == 0u);
+}
+
+BOOST_AUTO_TEST_CASE(BuildingWorkerRadiusMatchesBuildingJob)
+{
+    BOOST_TEST(GetBuildingWorkerRadius(BuildingType::Woodcutter) == 6u);
+    BOOST_TEST(GetBuildingWorkerRadius(BuildingType::Forester) == 6u);
+    BOOST_TEST(GetBuildingWorkerRadius(BuildingType::Fishery) == 7u);
+    BOOST_TEST(GetBuildingWorkerRadius(BuildingType::Quarry) == 8u);
+    BOOST_TEST(GetBuildingWorkerRadius(BuildingType::Sawmill) == 0u);
+    BOOST_TEST(GetBuildingWorkerRadius(BuildingType::Well) == 0u);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -11,20 +11,20 @@ class nobUsual;
 class nofWoodcutter : public nofFarmhand
 {
 private:
-    /// Malt den Arbeiter beim Arbeiten
+    /// Draws the worker while working
     void DrawWorking(DrawPoint drawPt) override;
     /// Id in jobs.bob or carrier.bob when carrying a ware
     unsigned short GetCarryID() const override;
 
-    /// Abgeleitete Klasse informieren, wenn sie anfängt zu arbeiten (Vorbereitungen)
+    /// Informs the derived class when work starts (preparations)
     void WorkStarted() override;
-    /// Abgeleitete Klasse informieren, wenn fertig ist mit Arbeiten
+    /// Informs the derived class when work is finished
     void WorkFinished() override;
 
     /// Returns the quality of this working point or determines if the worker can work here at all
     PointQuality GetPointQuality(MapPoint pt, bool isBeforeWork) const override;
 
-    /// wird aufgerufen, wenn die Arbeit abgebrochen wird (von nofBuildingWorker aufgerufen)
+    /// Called when work is aborted (called by nofBuildingWorker)
     void WorkAborted() override;
 
 public:

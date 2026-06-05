@@ -75,6 +75,28 @@ const helpers::EnumArray<BldWorkDescription, BuildingType> SUPPRESS_UNUSED BLD_W
   {},                                              // Harbour
 }};
 
+constexpr unsigned GetFarmhandWorkRadius(const Job job)
+{
+    switch(job)
+    {
+        case Job::Hunter:
+        case Job::Farmer:
+        case Job::Winegrower: return 2;
+        case Job::CharBurner: return 3;
+        case Job::Woodcutter:
+        case Job::Forester: return 6;
+        case Job::Fisher: return 7;
+        case Job::Stonemason: return 8;
+        default: return 0;
+    }
+}
+
+inline unsigned GetBuildingWorkerRadius(const BuildingType buildingType)
+{
+    const auto job = BLD_WORK_DESC[buildingType].job;
+    return job ? GetFarmhandWorkRadius(*job) : 0;
+}
+
 /// Smoke consts for all buildings and nations
 extern const helpers::MultiEnumArray<SmokeConst, Nation, BuildingType> BUILDING_SMOKE_CONSTS;
 

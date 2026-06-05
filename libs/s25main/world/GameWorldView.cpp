@@ -30,6 +30,7 @@
 #include "gameData/GuiConsts.h"
 #include "gameData/MapConsts.h"
 #include "s25util/error.h"
+#include "s25util/colors.h"
 #include "s25util/warningSuppression.h"
 #include <glad/glad.h>
 #include <boost/format.hpp>
@@ -233,6 +234,19 @@ void GameWorldView::Draw(const RoadBuildState& rb, const MapPoint selected, bool
 void GameWorldView::DrawGUI(const RoadBuildState& rb, const TerrainRenderer& terrainRenderer,
                             const MapPoint& selectedPt, bool drawMouse)
 {
+    MapPoint workerRadiusCenter = MapPoint::Invalid();
+    unsigned workerRadius = 0;
+    if(drawMouse && gwv.GetVisibility(selPt) == Visibility::Visible)
+    {
+        const auto* building = GetWorld().GetSpecObj<noBaseBuilding>(selPt);
+        if(building && building->GetGOT() != GO_Type::Buildingsite)
+        {
+            workerRadius = GetBuildingWorkerRadius(building->GetBuildingType());
+            if(workerRadius > 0)
+                workerRadiusCenter = selPt;
+        }
+    }
+
     // Falls im Straßenbaumodus: Punkte um den aktuellen Straßenbaupunkt herum ermitteln
     helpers::EnumArray<MapPoint, Direction> road_points;
 
@@ -255,6 +269,11 @@ void GameWorldView::DrawGUI(const RoadBuildState& rb, const TerrainRenderer& ter
             Position curOffset;
             MapPoint curPt = terrainRenderer.ConvertCoords(Position(x, y), &curOffset);
             Position curPos = GetWorld().GetNodePos(curPt) - offset + curOffset;
+
+            if(workerRadiusCenter.isValid() && curPt != workerRadiusCenter
+               && gwv.GetVisibility(curPt) == Visibility::Visible
+               && GetWorld().CalcDistance(workerRadiusCenter, curPt) <= workerRadius)
+                LOADER.GetMapTexture(20)->DrawFull(curPos, SetAlpha(COLOR_GREEN, 0x55));
 
             /// Current point indicated by Mouse
             if(drawMouse && selPt == curPt)
