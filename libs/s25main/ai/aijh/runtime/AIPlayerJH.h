@@ -139,7 +139,6 @@ public:
     // interfaces replace direct `AIPlayerJH` access.
     MapPoint FindBestPosition(BuildingType bt);
     void RecordGlobalPositionSearchInvocation() override;
-    void RecordGlobalPositionSearchCooldownSkip() override;
     void AddBuildJob(BuildingType type, MapPoint pt, bool front = false, bool searchPosition = true);
     void AddGlobalBuildJob(BuildingType type);
     void AddMilitaryBuildJob(MapPoint pt);

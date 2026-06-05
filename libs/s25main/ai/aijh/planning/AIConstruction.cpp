@@ -131,25 +131,34 @@ void AIConstruction::ExecuteJobs(unsigned limit)
         for(unsigned i = 0; processed < limit && !globalBuildJobs.empty() && i < initglobaljobs; i++)
         {
             auto job = PopGlobalBuildJob();
+            job->DecreasePriority(1);
             job->ExecuteJob();
-            // couldnt do job? -> move to back of list
-            if(job->GetState() != JobState::Finished && job->GetState() != JobState::Failed)
+            if(job->GetState() == JobState::Failed)
             {
-                if(job->WasBlockedByGlobalSearchCooldown())
+                const BuildJobFailReason failReason = job->GetFailReason();
+                if(failReason == BuildJobFailReason::Shortage || failReason == BuildJobFailReason::NoValidPosition)
                 {
-                    if(!globalBuildJobs.empty())
-                    {
-                        const unsigned lowestPriority = globalBuildJobs.rbegin()->priority;
-                        job->priority = lowestPriority > 0 ? lowestPriority - 1 : 0;
-                    }
-                } else if(job->priority > 0)
-                    job->priority--;
-                globalBuildJobs.emplace(std::move(*job));
-            } else
+                    job->DecreasePriority(failReason == BuildJobFailReason::Shortage ? 2u : 40u);
+                    job->ResetForRetry();
+                    globalBuildJobs.emplace(std::move(*job));
+                }
+                processed++;
+            } else if(job->GetState() == JobState::Finished)
             {
                 processed++;
+            } else
+            {
+                globalBuildJobs.emplace(std::move(*job));
             }
         }
+
+        std::multiset<BuildJob, CompareByPriority> reprioritizedGlobalBuildJobs;
+        for(BuildJob job : globalBuildJobs)
+        {
+            job.IncreasePriority(1);
+            reprioritizedGlobalBuildJobs.emplace(std::move(job));
+        }
+        globalBuildJobs = std::move(reprioritizedGlobalBuildJobs);
     }
 
     {
@@ -272,18 +281,6 @@ void AIConstruction::ConstructionsExecuted()
     constructionlocations.clear();
     std::fill(constructionorders.begin(), constructionorders.end(), 0u);
     waterRoadPlanned_ = false;
-}
-
-bool AIConstruction::IsGlobalSearchOnCooldown(const BuildingType type) const
-{
-    const unsigned currentGF = aijh.GetWorld().GetEvMgr().GetCurrentGF();
-    return currentGF < nextGlobalSearchAllowedGF_[type];
-}
-
-void AIConstruction::StartGlobalSearchCooldown(const BuildingType type, const unsigned durationGF)
-{
-    const unsigned currentGF = aijh.GetWorld().GetEvMgr().GetCurrentGF();
-    nextGlobalSearchAllowedGF_[type] = currentGF + durationGF;
 }
 
 namespace {

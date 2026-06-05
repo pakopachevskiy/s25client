@@ -9,6 +9,7 @@
 #include "gameTypes/BuildingType.h"
 #include "gameTypes/Direction.h"
 #include "gameTypes/MapCoordinates.h"
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -38,6 +39,14 @@ enum class SearchMode
     None,
     Radius,
     Global
+};
+
+enum class BuildJobFailReason
+{
+    None,
+    NotWanted,
+    Shortage,
+    NoValidPosition
 };
 
 class AIJob
@@ -75,14 +84,27 @@ public:
     void ExecuteJob() override;
     inline BuildingType GetType() const { return type; }
     inline MapPoint GetAround() const { return around; }
-    bool WasBlockedByGlobalSearchCooldown() const { return blockedByGlobalSearchCooldown_; }
+    BuildJobFailReason GetFailReason() const { return failReason_; }
+    void ResetForRetry()
+    {
+        state = JobState::Waiting;
+        failReason_ = BuildJobFailReason::None;
+        target = MapPoint::Invalid();
+        route.clear();
+    }
+    void DecreasePriority(unsigned amount) { priority = amount < priority ? priority - amount : 0; }
+    void IncreasePriority(unsigned amount)
+    {
+        constexpr unsigned maxPriority = std::numeric_limits<unsigned>::max();
+        priority = maxPriority - priority < amount ? maxPriority : priority + amount;
+    }
     unsigned priority;
 
 private:
     BuildingType type;
     MapPoint around;
     SearchMode searchMode;
-    bool blockedByGlobalSearchCooldown_ = false;
+    BuildJobFailReason failReason_ = BuildJobFailReason::None;
     std::vector<Direction> route;
 
     void TryToBuild();

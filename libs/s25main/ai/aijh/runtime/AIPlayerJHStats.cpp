@@ -25,11 +25,6 @@ void AIPlayerJH::RecordGlobalPositionSearchInvocation()
     ++globalPositionSearchInvocations_;
 }
 
-void AIPlayerJH::RecordGlobalPositionSearchCooldownSkip()
-{
-    ++globalPositionSearchCooldownSkips_;
-}
-
 unsigned long long AIPlayerJH::GetResourceValueCacheHits() const
 {
     return aii.Queries().GetResourceValueCacheHits();

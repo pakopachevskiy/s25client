@@ -131,4 +131,3 @@
     std::map<RoadWorkloadBypassSegmentKey, unsigned, RoadWorkloadBypassSegmentKeyLess>
       roadWorkloadBypassRetryAfterGF_;
     uint64_t globalPositionSearchInvocations_ = 0;
-    uint64_t globalPositionSearchCooldownSkips_ = 0;

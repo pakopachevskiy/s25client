@@ -106,8 +106,6 @@ public:
     /// To be called when the current pending construction orders were processed (usually on NWF)
     void ConstructionsExecuted();
     bool HasPlannedWaterRoad() const { return waterRoadPlanned_; }
-    bool IsGlobalSearchOnCooldown(BuildingType type) const;
-    void StartGlobalSearchCooldown(BuildingType type, unsigned durationGF);
 
 private:
     bool BuildWaterRoad(const noRoadNode* start, const noRoadNode* target, std::vector<Direction>& route);
@@ -128,7 +126,6 @@ private:
     std::deque<MapPoint> constructionlocations;
     // contains the amount of buildings ordered since the last nwf
     helpers::EnumArray<uint8_t, BuildingType> constructionorders;
-    helpers::EnumArray<unsigned, BuildingType> nextGlobalSearchAllowedGF_{};
     bool waterRoadPlanned_ = false;
 };
 

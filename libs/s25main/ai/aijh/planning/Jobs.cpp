@@ -27,8 +27,6 @@
 namespace AIJH {
 
 namespace {
-constexpr unsigned kGlobalBuildSearchCooldownGF = 500;
-
 unsigned GetMaxBuildingSites(const AIPlanningContext& aijh)
 {
     const AIConfig& config = aijh.GetConfig();
@@ -44,7 +42,6 @@ AIJob::AIJob(AIPlanningContext& aijh) : aijh(aijh), state(JobState::Waiting) {}
 
 void BuildJob::ExecuteJob()
 {
-    blockedByGlobalSearchCooldown_ = false;
     const std::optional<ScopedAIGlobalBuildJobProfile> globalBuildJobProfile =
       (searchMode == SearchMode::Global) ? std::make_optional<ScopedAIGlobalBuildJobProfile>(type) : std::nullopt;
 
@@ -91,33 +88,39 @@ void BuildJob::ExecuteJob()
 
 void BuildJob::TryToBuild()
 {
+    failReason_ = BuildJobFailReason::None;
     AIConstruction& aiConstruction = aijh.GetConstruction();
 
     if(!aiConstruction.Wanted(type))
     {
-        state = JobState::Finished;
+        failReason_ = BuildJobFailReason::NotWanted;
+        state = JobState::Failed;
         return;
     }
 
     if(aijh.GetInterface().GetBuildingSites().size() >= GetMaxBuildingSites(aijh))
     {
+        if(searchMode == SearchMode::Global)
+        {
+            failReason_ = BuildJobFailReason::Shortage;
+            state = JobState::Failed;
+        }
         return;
     }
 
     if(aiConstruction.HasConstructionMaterialShortage(type))
     {
+        if(searchMode == SearchMode::Global)
+        {
+            failReason_ = BuildJobFailReason::Shortage;
+            state = JobState::Failed;
+        }
         return;
     }
 
     MapPoint foundPos = MapPoint::Invalid();
     if(searchMode == SearchMode::Global)
     {
-        if(aiConstruction.IsGlobalSearchOnCooldown(type))
-        {
-            aijh.RecordGlobalPositionSearchCooldownSkip();
-            blockedByGlobalSearchCooldown_ = true;
-            return;
-        }
         foundPos = aijh.FindBestPosition(type);
     } else if(searchMode == SearchMode::Radius)
     {
@@ -167,8 +170,7 @@ void BuildJob::TryToBuild()
 
     if(!foundPos.isValid())
     {
-        if(searchMode == SearchMode::Global)
-            aiConstruction.StartGlobalSearchCooldown(type, kGlobalBuildSearchCooldownGF);
+        failReason_ = BuildJobFailReason::NoValidPosition;
         state = JobState::Failed;
 #ifdef DEBUG_AI
         std::cout << "Player " << (unsigned)aijh.GetPlayerId() << ", Job failed: No Position found for "

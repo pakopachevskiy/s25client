@@ -16,8 +16,7 @@ See also:
   for `CalcResourceValue`, the dominant cost in this scan.
 - [construction-mechanics.md](construction-mechanics.md) — how the
   global position search interacts with the build-job queues and the
-  per-`BuildingType` cooldown that fires on `MapPoint::Invalid()`
-  results.
+  priority penalty applied after `MapPoint::Invalid()` results.
 - [road-route-selection.md](road-route-selection.md) — what happens
   after a position is chosen and the AI must wire it up.
 

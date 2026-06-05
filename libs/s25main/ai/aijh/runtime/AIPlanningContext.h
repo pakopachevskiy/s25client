@@ -24,7 +24,6 @@ public:
 
     virtual MapPoint FindBestPosition(BuildingType bt) = 0;
     virtual void RecordGlobalPositionSearchInvocation() = 0;
-    virtual void RecordGlobalPositionSearchCooldownSkip() = 0;
     virtual void AddBuildJob(BuildingType type, MapPoint pt, bool front = false, bool searchPosition = true) = 0;
     virtual void AddGlobalBuildJob(BuildingType type) = 0;
     virtual void RecalcGround(MapPoint buildingPos, std::vector<Direction>& route_road) = 0;

@@ -3,8 +3,8 @@
 See also:
 
 - [position-finding.md](position-finding.md) — `FindBestPosition` /
-  `FindPositionForBuildingAround` are the searches that feed (and can
-  trip the cooldown described below).
+  `FindPositionForBuildingAround` are the searches that feed the build
+  queues.
 - [road-route-selection.md](road-route-selection.md) — details for
   `ConnectFlagToRoadSystem`, `BuildAlternativeRoad`, and the road
   scoring referenced by the road/flag utilities here.
@@ -18,10 +18,9 @@ See also:
 - `AddGlobalBuildJob` keeps a single global job per `BuildingType` for non-military types, so
   strategic one-off goals (e.g., “build a shipyard somewhere”) do not stack and spam the planner.
   Military global jobs are capped at three queued jobs per building type rather than one.
-- Global jobs also participate in a per-`BuildingType` retry cooldown after a full-map search
-  fails to find any valid position. The cooldown is only for `SearchMode::Global`; enqueueing
-  still happens normally so event-driven goals such as `Storehouse` are not lost. The cooldown
-  duration is `kGlobalBuildSearchCooldownGF = 1000` game frames.
+- Global jobs are ordered by `BuildJob::priority`. Full-map searches that fail to find a valid
+  position are requeued with a large priority penalty, delaying expensive retries while keeping
+  the strategic goal alive.
 - `AddBuildJob` handles per-location work. It forbids invalid shipyard spots, allows multiple
   simultaneous military builds, but deduplicates non-military jobs by `type + around` so only
   one farmhouse, quarry, etc. is queued for a specific area at a time. Jobs can be pushed to
@@ -53,30 +52,20 @@ See also:
   same wrapper, so every AI stimulus still results in the same deduped `buildJobs` entries.
 
 ## Execution Order
-- `ExecuteJobs(limit)` interleaves work from three queues: up to five connection jobs,
-  followed by up to five global build jobs, then location-specific build jobs, all bounded by
-  the supplied limit. This keeps AI cycles short while ensuring each queue makes forward
-  progress every tick.
-- Connect and build jobs that report `JobState::Finished` or `JobState::Failed` drop out;
-  everything else is requeued at the back so transient blockers (enemy presence, missing
-  wares) retry later.
-- Global jobs live in an ordered multiset. When a job cannot run, its priority is decreased
-  before being reinserted, preventing one stubborn goal from starving newer entries.
-- One exception exists for cooldown-blocked global jobs: if a job reaches execution while its
-  per-type global-search cooldown is still active, it skips `FindBestPosition()`, stays queued,
-  and is reinserted behind the current global queue so other global goals can run first.
-
-## Global Search Cooldown
-- The cooldown starts only when a global building-position search returns
-  `MapPoint::Invalid()`. It does not start for later failures such as `SetBuildingSite()`
-  rejection, BQ changes after placement, road-connection failure, or destroyed sites/flags.
-  It also does not start when a found position is rejected by `CanStillConstructHere`.
-- The timer is tracked in `AIConstruction` per `BuildingType` and lasts
-  `kGlobalBuildSearchCooldownGF = 1000` game frames. The current implementation uses time
-  expiry only; unrelated world updates do not clear it.
-- This throttle complements the global position cache instead of replacing it. Frequent cache
-  invalidations can still happen, but the cooldown prevents repeated full-map rescans for the
-  same building type during that short backoff window.
+- `ExecuteJobs(limit)` interleaves work from three queues: up to five global build jobs,
+  followed by up to five location-specific build jobs, then connection jobs. Global and
+  location-specific jobs are bounded by the supplied limit; connection jobs process up to
+  the queue size captured at the start of the tick. This keeps AI cycles short while ensuring
+  each queue makes forward progress every tick.
+- Local build jobs and connect jobs that report `JobState::Finished` or `JobState::Failed`
+  drop out; everything else is requeued at the back so transient blockers retry later.
+- Global jobs live in an ordered multiset. Before a global job runs, its priority is decreased
+  by 1. After the global-job cycle, every queued global job gains 1 priority, so jobs that
+  were not selected gradually rise relative to recently attempted work.
+- Global `BuildJob` failures carry a `BuildJobFailReason`. `NotWanted` jobs are dropped.
+  `Shortage` jobs, such as active-site-cap or construction-material blockers, are requeued
+  with an additional 2-point priority penalty. `NoValidPosition` jobs are requeued with an
+  additional 40-point penalty, delaying repeated full-map scans when no suitable tile exists.
 
 ## Construction Reservation Tracking
 - `constructionlocations` collects every point touched by orders during the current navigation
