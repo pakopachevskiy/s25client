@@ -6,17 +6,13 @@
 
 #include "GamePlayer.h"
 #include "WareProductionStatsHolder.h"
-#include "ai/AIPlayer.h"
-#include "buildings/nobBaseWarehouse.h"
+#include "buildings/noBuildingSite.h"
 #include "buildings/nobUsual.h"
 #include "factories/BuildingFactory.h"
 #include "gameData/BuildingConsts.h"
 #include "gameData/JobConsts.h"
-#include "gameTypes/Inventory.h"
 #include "worldFixtures/WorldWithGCExecution.h"
-#include <boost/optional/optional.hpp>
 #include <boost/test/unit_test.hpp>
-#include <algorithm>
 
 namespace {
 
@@ -26,27 +22,6 @@ struct WareDemandStatsHolderFixture : DemandWorld
 {
     WareDemandStatsHolderFixture() { WareDemandStatsHolder::Reset(); }
     ~WareDemandStatsHolderFixture() { WareDemandStatsHolder::Reset(); }
-};
-
-struct MockAI final : AIPlayer
-{
-    MockAI(unsigned char playerId, const GameWorldBase& world) : AIPlayer(playerId, world, AI::Level::Easy)
-    {
-        std::fill(wanted.begin(), wanted.end(), 0u);
-    }
-
-    void RunGF(unsigned /*gf*/, bool /*gfisnwf*/) override {}
-    void OnChatMessage(unsigned /*sendPlayerId*/, ChatDestination, const std::string& /*msg*/) override {}
-
-    boost::optional<unsigned> GetNumBuildingsWanted(const BuildingType type) const override
-    {
-        if(!hasWantedData)
-            return boost::none;
-        return wanted[type];
-    }
-
-    bool hasWantedData = true;
-    helpers::EnumArray<unsigned, BuildingType> wanted;
 };
 
 MapPoint GetRouteEnd(const GameWorldBase& world, MapPoint pt, const std::vector<Direction>& route)
@@ -80,10 +55,17 @@ unsigned CyclesPerWindow(const BuildingType type)
     return (WareProductionStatsHolder::WINDOW_SIZE_GF + cycleGf - 1u) / cycleGf;
 }
 
-unsigned CountAvailableBuilders(const GamePlayer& player)
+MapPoint FindBuildablePoint(const GameWorldBase& world, const BuildingType type)
 {
-    const Inventory& inventory = player.GetInventory();
-    return inventory[Job::Builder] + std::min(inventory[Job::Helper], inventory[GoodType::Hammer]);
+    const MapPoint hqPos = world.GetPlayer(0).GetHQPos();
+    for(const MapPoint pt : world.GetPointsInRadiusWithCenter(hqPos, 9))
+    {
+        if(world.CalcDistance(pt, hqPos) < 5)
+            continue;
+        if(canUseBq(world.GetNode(pt).bq, BUILDING_SIZE[type]))
+            return pt;
+    }
+    return MapPoint::Invalid();
 }
 
 } // namespace
@@ -149,30 +131,23 @@ BOOST_AUTO_TEST_CASE(MineFoodDemandIsSplitAcrossAcceptedFoodWares)
     BOOST_TEST(expectedFoodDemand == 5u);
 }
 
-BOOST_AUTO_TEST_CASE(AIConstructionDemandUsesWantedProportionsAndAvailableBuilders)
+BOOST_AUTO_TEST_CASE(ConstructionDemandSumsFullCostsOfCurrentBuildingSites)
 {
-    Inventory inventory;
-    inventory.Add(Job::Builder);
-    inventory.Add(Job::Helper);
-    inventory.Add(GoodType::Hammer);
-    world.GetSpecObj<nobBaseWarehouse>(hqPos)->AddGoods(inventory, true);
+    const MapPoint woodcutterPos = FindBuildablePoint(world, BuildingType::Woodcutter);
+    BOOST_TEST_REQUIRE(woodcutterPos.isValid());
+    world.SetBuildingSite(BuildingType::Woodcutter, woodcutterPos, 0);
+    BOOST_TEST_REQUIRE(world.GetSpecObj<noBuildingSite>(woodcutterPos));
 
-    const unsigned availableBuilders = CountAvailableBuilders(world.GetPlayer(0));
-    BOOST_TEST_REQUIRE(availableBuilders > 0u);
+    const MapPoint farmPos = FindBuildablePoint(world, BuildingType::Farm);
+    BOOST_TEST_REQUIRE(farmPos.isValid());
+    world.SetBuildingSite(BuildingType::Farm, farmPos, 0);
+    BOOST_TEST_REQUIRE(world.GetSpecObj<noBuildingSite>(farmPos));
 
-    MockAI ai(0, world);
-    ai.wanted[BuildingType::Barracks] = availableBuilders;
-    ai.wanted[BuildingType::Guardhouse] = availableBuilders;
-
-    const WareDemandSnapshot& demand = WareDemandStatsHolder::GetCurrentDemand(world, 0, 0, &ai);
-    const unsigned expectedBarracks = (availableBuilders + 1u) / 2u;
-    const unsigned expectedGuardhouses = availableBuilders / 2u;
+    const WareDemandSnapshot& demand = WareDemandStatsHolder::GetCurrentDemand(world, 0, 0, nullptr);
     const unsigned expectedBoards =
-      expectedBarracks * BUILDING_COSTS[BuildingType::Barracks].boards
-      + expectedGuardhouses * BUILDING_COSTS[BuildingType::Guardhouse].boards;
+      BUILDING_COSTS[BuildingType::Woodcutter].boards + BUILDING_COSTS[BuildingType::Farm].boards;
     const unsigned expectedStones =
-      expectedBarracks * BUILDING_COSTS[BuildingType::Barracks].stones
-      + expectedGuardhouses * BUILDING_COSTS[BuildingType::Guardhouse].stones;
+      BUILDING_COSTS[BuildingType::Woodcutter].stones + BUILDING_COSTS[BuildingType::Farm].stones;
 
     BOOST_TEST(demand.calculated[GoodType::Boards]);
     BOOST_TEST(demand.calculated[GoodType::Stones]);
@@ -180,31 +155,11 @@ BOOST_AUTO_TEST_CASE(AIConstructionDemandUsesWantedProportionsAndAvailableBuilde
     BOOST_TEST(demand.demand[GoodType::Stones] == expectedStones);
 }
 
-BOOST_AUTO_TEST_CASE(AIConstructionDemandAllocatesAllAvailableBuildersEvenWhenWantedDeficitIsSmaller)
+BOOST_AUTO_TEST_CASE(ConstructionDemandIsZeroWithoutCurrentBuildingSites)
 {
-    const unsigned availableBuilders = CountAvailableBuilders(world.GetPlayer(0));
-    BOOST_TEST_REQUIRE(availableBuilders >= 20u);
-
-    MockAI ai(0, world);
-    ai.wanted[BuildingType::Barracks] = 1;
-
-    const WareDemandSnapshot& demand = WareDemandStatsHolder::GetCurrentDemand(world, 0, 0, &ai);
-    BOOST_TEST(demand.demand[GoodType::Boards] == availableBuilders * BUILDING_COSTS[BuildingType::Barracks].boards);
-    BOOST_TEST(demand.demand[GoodType::Boards] >= 40u);
-}
-
-BOOST_AUTO_TEST_CASE(AIConstructionDemandIsSkippedWhenWantedCountsAreUnavailable)
-{
-    Inventory inventory;
-    inventory.Add(Job::Builder, 3);
-    inventory.Add(Job::Helper, 3);
-    inventory.Add(GoodType::Hammer, 3);
-    world.GetSpecObj<nobBaseWarehouse>(hqPos)->AddGoods(inventory, true);
-
-    MockAI ai(0, world);
-    ai.hasWantedData = false;
-
-    const WareDemandSnapshot& demand = WareDemandStatsHolder::GetCurrentDemand(world, 0, 0, &ai);
+    const WareDemandSnapshot& demand = WareDemandStatsHolder::GetCurrentDemand(world, 0, 0, nullptr);
+    BOOST_TEST(demand.calculated[GoodType::Boards]);
+    BOOST_TEST(demand.calculated[GoodType::Stones]);
     BOOST_TEST(demand.demand[GoodType::Boards] == 0u);
     BOOST_TEST(demand.demand[GoodType::Stones] == 0u);
 }

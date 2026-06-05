@@ -116,6 +116,9 @@ platform support, and optional sanitizers for development builds.
   is enabled, requested, and routed between eligible buildings.
 - [AI configuration](ai/configuration.md) – Configuration surface and loaded
   settings.
+- [AI ware demand calculation](ai/economy/demand-calculation.md) – Demand
+  snapshot sources, recurring cycle formulas, construction-site costs, and
+  cache behavior.
 - [Attack target selection](ai/attack-target-selection.md) – Target-choice
   pipeline and heuristics.
 - [Construction mechanics](ai/construction-mechanics.md) – Queueing and
