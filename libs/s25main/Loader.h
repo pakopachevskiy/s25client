@@ -108,6 +108,7 @@ public:
     ITexture* GetTextureN(const ResourceId& file, unsigned nr);
     glArchivItem_Bitmap* GetImage(const ResourceId& file, const std::string& name);
     glArchivItem_Bitmap_Player* GetPlayerImage(const ResourceId& file, unsigned nr);
+    glArchivItem_Bitmap_Player* GetCarrierAnimationImage(Nation nation, unsigned nr);
     glFont* GetFont(FontSize);
     libsiedler2::ArchivItem_Palette* GetPaletteN(const ResourceId& file, unsigned nr = 0);
     SoundEffectItem* GetSoundN(const ResourceId& file, unsigned nr);
@@ -191,17 +192,19 @@ public:
     helpers::MultiArray<glSmartBitmap, 2, 4> grainfield_cache;
     /// Carrier w/ ware: NormalOrFat, Ware, Direction
     std::array<helpers::MultiEnumArray<AnimationSprites, GoodType, Direction>, 2> carrier_cache;
-    glSmartBitmap& getCarrierSprite(GoodType ware, bool fat, Direction dir, unsigned aniFrame)
+    std::array<helpers::MultiEnumArray<AnimationSprites, GoodType, Direction>, 2> african_carrier_cache;
+    glSmartBitmap& getCarrierSprite(Nation nat, GoodType ware, bool fat, Direction dir, unsigned aniFrame)
     {
-        return carrier_cache[fat][ware][dir][aniFrame];
+        return (nat == Nation::Africans ? african_carrier_cache : carrier_cache)[fat][ware][dir][aniFrame];
     }
     /// Boundary stones: Nation
     helpers::EnumArray<glSmartBitmap, Nation> boundary_stone_cache;
     /// BoatCarrier: Direction, AnimationFrame
     std::array<AnimationSprites, 6> boat_cache;
-    glSmartBitmap& getBoatCarrierSprite(Direction dir, unsigned aniFrame)
+    std::array<AnimationSprites, 6> african_boat_cache;
+    glSmartBitmap& getBoatCarrierSprite(Nation nat, Direction dir, unsigned aniFrame)
     {
-        return boat_cache[rttr::enum_cast(dir)][aniFrame];
+        return (nat == Nation::Africans ? african_boat_cache : boat_cache)[rttr::enum_cast(dir)][aniFrame];
     }
     /// Donkey: Direction, AnimationFrame
     std::array<AnimationSprites, 6> donkey_cache;
@@ -227,6 +230,7 @@ private:
     std::unique_ptr<ArchiveLoader> archiveLoader_;
     std::map<ResourceId, FileEntry> files_;
     std::vector<glFont> fonts;
+    std::map<unsigned, std::unique_ptr<glArchivItem_Bitmap_Player>> africanCarrierAnimationImages_;
 
     bool isWinterGFX_;
     helpers::EnumArray<libsiedler2::Archiv*, Nation> nation_gfx;

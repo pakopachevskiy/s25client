@@ -177,8 +177,8 @@ void nofCarrier::Draw(DrawPoint drawPt)
                         {
                             // Nein, dann Animation abspielen
                             LOADER
-                              .GetPlayerImage(
-                                "rom_bobs",
+                              .GetCarrierAnimationImage(
+                                world->GetPlayer(player).nation,
                                 ANIMATIONS[fat ? 1 : 0][animation_id][(current_gf - next_animation) / FRAME_GF])
                               ->DrawFull(drawPt, COLOR_WHITE, world->GetPlayer(player).color);
                         } else // Silvesteregg
@@ -208,7 +208,7 @@ void nofCarrier::Draw(DrawPoint drawPt)
                       || (waiting_for_free_node && !IsStoppedBetweenNodes() && carried_ware))
             {
                 // Steht und wartet (mit Ware)
-                LOADER.getCarrierSprite(carried_ware->type, fat, GetCurMoveDir(), 2)
+                LOADER.getCarrierSprite(world->GetPlayer(player).nation, carried_ware->type, fat, GetCurMoveDir(), 2)
                   .draw(drawPt, COLOR_WHITE, world->GetPlayer(player).color);
             } else
             {
@@ -268,12 +268,12 @@ void nofCarrier::Draw(DrawPoint drawPt)
             } else if(state == CarrierState::WaitForWare
                       || (waiting_for_free_node && !IsStoppedBetweenNodes() && !carried_ware))
             {
-                LOADER.getBoatCarrierSprite(GetCurMoveDir(), 0)
+                LOADER.getBoatCarrierSprite(world->GetPlayer(player).nation, GetCurMoveDir(), 0)
                   .draw(drawPt, 0xFFFFFFFF, world->GetPlayer(player).color);
             } else if(state == CarrierState::WaitForWareSpace
                       || (waiting_for_free_node && !IsStoppedBetweenNodes() && carried_ware))
             {
-                LOADER.getBoatCarrierSprite(GetCurMoveDir(), 0)
+                LOADER.getBoatCarrierSprite(world->GetPlayer(player).nation, GetCurMoveDir(), 0)
                   .draw(drawPt, 0xFFFFFFFF, world->GetPlayer(player).color);
 
                 // Ware im Boot zeichnen
@@ -285,7 +285,7 @@ void nofCarrier::Draw(DrawPoint drawPt)
                 drawPt += CalcFigurRelative();
 
                 // ruderndes Boot zeichnen
-                LOADER.getBoatCarrierSprite(GetCurMoveDir(), ani_step)
+                LOADER.getBoatCarrierSprite(world->GetPlayer(player).nation, GetCurMoveDir(), ani_step)
                   .draw(drawPt, 0xFFFFFFFF, world->GetPlayer(player).color);
 
                 // Läuft normal mit oder ohne Ware

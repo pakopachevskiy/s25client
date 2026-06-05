@@ -57,6 +57,14 @@ void glSmartBitmap::add(libsiedler2::ArchivItem_Bitmap_Player* bmp)
     calcDimensions();
 }
 
+void glSmartBitmap::add(std::unique_ptr<libsiedler2::ArchivItem_Bitmap_Player> bmp)
+{
+    if(!bmp)
+        return;
+    items.push_back(glBitmapItem(bmp.release(), true));
+    calcDimensions();
+}
+
 void glSmartBitmap::add(libsiedler2::baseArchivItem_Bitmap* bmp)
 {
     if(!bmp)

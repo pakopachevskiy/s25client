@@ -16,6 +16,7 @@
 #include "files.h"
 #include "helpers/EnumRange.h"
 #include "helpers/containerUtils.h"
+#include "ogl/CarrierSkinRecolor.h"
 #include "ogl/MusicItem.h"
 #include "ogl/SoundEffectItem.h"
 #include "ogl/glArchivItem_Bitmap_Player.h"
@@ -103,6 +104,20 @@ glArchivItem_Bitmap* Loader::GetImage(const ResourceId& file, const std::string&
 glArchivItem_Bitmap_Player* Loader::GetPlayerImage(const ResourceId& file, unsigned nr)
 {
     return convertChecked<glArchivItem_Bitmap_Player*>(files_[file].archive[nr]);
+}
+
+glArchivItem_Bitmap_Player* Loader::GetCarrierAnimationImage(Nation nation, unsigned nr)
+{
+    auto* const image = GetPlayerImage("rom_bobs", nr);
+    if(nation != Nation::Africans || !image)
+        return image;
+
+    auto it = africanCarrierAnimationImages_.find(nr);
+    if(it == africanCarrierAnimationImages_.end())
+        it = africanCarrierAnimationImages_
+               .emplace(nr, carrierSkinRecolor::createAfricanCarrierSkin(*image))
+               .first;
+    return it->second.get();
 }
 
 glFont* Loader::GetFont(FontSize size)
@@ -686,10 +701,18 @@ void Loader::fillCaches()
                     const auto& spriteData = JOB_SPRITE_CONSTS[Job(job)];
                     const libsiedler2::ImgDir imgDir = toImgDir(dir);
 
-                    bmp.add(dynamic_cast<glArchivItem_Bitmap_Player*>(
-                      bob_jobs->getBody(spriteData.isFat(), imgDir, ani_step)));
-                    bmp.add(dynamic_cast<glArchivItem_Bitmap_Player*>(
-                      bob_jobs->getOverlay(spriteData.getBobId(Nation(nation)), spriteData.isFat(), imgDir, ani_step)));
+                    auto* body =
+                      dynamic_cast<glArchivItem_Bitmap_Player*>(bob_jobs->getBody(spriteData.isFat(), imgDir, ani_step));
+                    if(nation == Nation::Africans && job == Job::Helper && body)
+                        bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
+                    else
+                        bmp.add(body);
+                    auto* overlay = dynamic_cast<glArchivItem_Bitmap_Player*>(
+                      bob_jobs->getOverlay(spriteData.getBobId(Nation(nation)), spriteData.isFat(), imgDir, ani_step));
+                    if(nation == Nation::Africans && job == Job::Helper && overlay)
+                        bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*overlay));
+                    else
+                        bmp.add(overlay);
                     bmp.addShadow(GetMapImage(900 + static_cast<unsigned>(imgDir) * 8 + ani_step));
 
                     stp->add(bmp);
@@ -706,8 +729,16 @@ void Loader::fillCaches()
 
                 const libsiedler2::ImgDir imgDir = toImgDir(dir);
 
-                bmp.add(dynamic_cast<glArchivItem_Bitmap_Player*>(bob_jobs->getBody(true, imgDir, ani_step)));
-                bmp.add(dynamic_cast<glArchivItem_Bitmap_Player*>(bob_jobs->getOverlay(0, true, imgDir, ani_step)));
+                auto* body = dynamic_cast<glArchivItem_Bitmap_Player*>(bob_jobs->getBody(true, imgDir, ani_step));
+                if(nation == Nation::Africans && body)
+                    bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
+                else
+                    bmp.add(body);
+                auto* overlay = dynamic_cast<glArchivItem_Bitmap_Player*>(bob_jobs->getOverlay(0, true, imgDir, ani_step));
+                if(nation == Nation::Africans && overlay)
+                    bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*overlay));
+                else
+                    bmp.add(overlay);
                 bmp.addShadow(GetMapImage(900 + static_cast<unsigned>(imgDir) * 8 + ani_step));
 
                 stp->add(bmp);
@@ -857,14 +888,25 @@ void Loader::fillCaches()
     {
         for(unsigned ani_step = 0; ani_step < 8; ++ani_step)
         {
-            glSmartBitmap& bmp = getBoatCarrierSprite(dir, ani_step);
+            glSmartBitmap& bmp = getBoatCarrierSprite(Nation::Romans, dir, ani_step);
 
             bmp.reset();
 
-            bmp.add(GetPlayerImage("boat", rttr::enum_cast(dir + 3u) * 8 + ani_step));
+            auto* body = GetPlayerImage("boat", rttr::enum_cast(dir + 3u) * 8 + ani_step);
+            bmp.add(body);
             bmp.addShadow(GetMapImage(2048 + rttr::enum_cast(dir) % 3));
 
             stp->add(bmp);
+
+            glSmartBitmap& africanBmp = getBoatCarrierSprite(Nation::Africans, dir, ani_step);
+
+            africanBmp.reset();
+
+            if(body)
+                africanBmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
+            africanBmp.addShadow(GetMapImage(2048 + rttr::enum_cast(dir) % 3));
+
+            stp->add(africanBmp);
         }
     }
 
@@ -885,38 +927,68 @@ void Loader::fillCaches()
             {
                 for(unsigned ani_step = 0; ani_step < 8; ++ani_step)
                 {
-                    glSmartBitmap& bmp = getCarrierSprite(ware, fat, dir, ani_step);
-                    bmp.reset();
-
                     // Japanese shield is missing
                     const unsigned id =
                       rttr::enum_cast((ware == GoodType::ShieldJapanese) ? GoodType::ShieldRomans : ware);
 
                     const libsiedler2::ImgDir imgDir = toImgDir(dir);
+                    const auto addCarrierLayers = [&](glSmartBitmap& bmp, const bool african) {
+                        bmp.reset();
 
-                    if(ware == GoodType::Grapes)
-                    {
-                        const unsigned bodyIdx = static_cast<unsigned>(imgDir) * 8 + ani_step;
-                        bmp.add(dynamic_cast<glArchivItem_Bitmap_Player*>(wine_bob_carrier.get(
-                          wineaddon::bobIndex[fat ? wineaddon::BobTypes::FAT_CARRIER_CARRYING_GRAPES :
-                                                    wineaddon::BobTypes::THIN_CARRIER_CARRYING_GRAPES]
-                          + bodyIdx)));
-                    } else if(ware == GoodType::Wine)
-                    {
-                        bmp.add(dynamic_cast<glArchivItem_Bitmap_Player*>(bob_carrier->getBody(fat, imgDir, ani_step)));
-                        bmp.add(dynamic_cast<glArchivItem_Bitmap_Player*>(wine_bob_carrier.get(
-                          wineaddon::bobIndex[fat ? wineaddon::BobTypes::FAT_CARRIER_CARRYING_WINE :
-                                                    wineaddon::BobTypes::THIN_CARRIER_CARRYING_WINE]
-                          + static_cast<unsigned>(imgDir))));
-                    } else
-                    {
-                        bmp.add(dynamic_cast<glArchivItem_Bitmap_Player*>(bob_carrier->getBody(fat, imgDir, ani_step)));
-                        bmp.add(dynamic_cast<glArchivItem_Bitmap_Player*>(
-                          bob_carrier->getOverlay(id, fat, imgDir, ani_step)));
-                    }
-                    bmp.addShadow(GetMapImage(900 + static_cast<unsigned>(imgDir) * 8 + ani_step));
+                        if(ware == GoodType::Grapes)
+                        {
+                            const unsigned bodyIdx = static_cast<unsigned>(imgDir) * 8 + ani_step;
+                            auto* body = dynamic_cast<glArchivItem_Bitmap_Player*>(wine_bob_carrier.get(
+                              wineaddon::bobIndex[fat ? wineaddon::BobTypes::FAT_CARRIER_CARRYING_GRAPES :
+                                                        wineaddon::BobTypes::THIN_CARRIER_CARRYING_GRAPES]
+                              + bodyIdx));
+                            if(african && body)
+                                bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
+                            else
+                                bmp.add(body);
+                        } else if(ware == GoodType::Wine)
+                        {
+                            auto* body =
+                              dynamic_cast<glArchivItem_Bitmap_Player*>(bob_carrier->getBody(fat, imgDir, ani_step));
+                            if(african && body)
+                                bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
+                            else
+                                bmp.add(body);
+                            auto* overlay = dynamic_cast<glArchivItem_Bitmap_Player*>(wine_bob_carrier.get(
+                              wineaddon::bobIndex[fat ? wineaddon::BobTypes::FAT_CARRIER_CARRYING_WINE :
+                                                        wineaddon::BobTypes::THIN_CARRIER_CARRYING_WINE]
+                              + static_cast<unsigned>(imgDir)));
+                            if(african && overlay)
+                                bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*overlay));
+                            else
+                                bmp.add(overlay);
+                        } else
+                        {
+                            auto* body =
+                              dynamic_cast<glArchivItem_Bitmap_Player*>(bob_carrier->getBody(fat, imgDir, ani_step));
+                            if(african && body)
+                                bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
+                            else
+                                bmp.add(body);
+                            auto* overlay =
+                              dynamic_cast<glArchivItem_Bitmap_Player*>(bob_carrier->getOverlay(id, fat, imgDir, ani_step));
+                            if(african && overlay)
+                                bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*overlay));
+                            else
+                                bmp.add(overlay);
+                        }
+                        bmp.addShadow(GetMapImage(900 + static_cast<unsigned>(imgDir) * 8 + ani_step));
+                    };
+
+                    glSmartBitmap& bmp = getCarrierSprite(Nation::Romans, ware, fat, dir, ani_step);
+                    addCarrierLayers(bmp, false);
 
                     stp->add(bmp);
+
+                    glSmartBitmap& africanBmp = getCarrierSprite(Nation::Africans, ware, fat, dir, ani_step);
+                    addCarrierLayers(africanBmp, true);
+
+                    stp->add(africanBmp);
                 }
             }
         }

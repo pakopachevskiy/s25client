@@ -758,7 +758,7 @@ void noFigure::DrawWalkingCarrier(DrawPoint drawPt, helpers::OptionalEnum<GoodTy
 {
     const unsigned ani_step = CalcWalkAnimationFrame();
     const GamePlayer& owner = world->GetPlayer(player);
-    auto& sprite = ware ? LOADER.getCarrierSprite(*ware, fat, GetCurMoveDir(), ani_step) :
+    auto& sprite = ware ? LOADER.getCarrierSprite(owner.nation, *ware, fat, GetCurMoveDir(), ani_step) :
                           LOADER.getCarrierBobSprite(owner.nation, fat, GetCurMoveDir(), ani_step);
     sprite.drawForPlayer(InterpolateWalkDrawPos(drawPt), owner.color);
 }

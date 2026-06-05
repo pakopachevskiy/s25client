@@ -68,5 +68,6 @@ public:
     void add(libsiedler2::baseArchivItem_Bitmap* bmp);
     void add(std::unique_ptr<libsiedler2::baseArchivItem_Bitmap> bmp);
     void add(libsiedler2::ArchivItem_Bitmap_Player* bmp);
+    void add(std::unique_ptr<libsiedler2::ArchivItem_Bitmap_Player> bmp);
     void addShadow(libsiedler2::baseArchivItem_Bitmap* bmp);
 };
