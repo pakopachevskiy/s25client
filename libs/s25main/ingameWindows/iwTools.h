@@ -24,22 +24,32 @@ private:
     GameCommandFactory& gcFactory;
     /// How the order for each tool should be changed (pending actual transmission)
     helpers::EnumArray<int8_t, Tool> pendingOrderChanges;
-    /// Einstellungen nach dem letzten Netzwerk-Versenden nochmal verändert?
+    /// Were settings changed again after the last network transmission?
     bool ordersChanged;
     bool shouldUpdateTexts;
     bool isReplay;
+    unsigned selectedPlayerId;
+    unsigned numPlayingPlayers;
     Subscription toolSubscription;
 
     void AddToolSettingSlider(unsigned id, GoodType ware);
-    /// Updatet die Steuerelemente mit den übergebenen Einstellungen
+    /// Updates the controls with the given settings
     void UpdateSettings(const ToolSettings& tool_settings);
     void UpdateSettings() override;
-    /// Sendet veränderte Einstellungen (an den Client), falls sie verändert wurden
+    /// Sends changed settings to the client if they were modified
     void TransmitSettings() override;
 
+    void Draw_() override;
     void Msg_ButtonClick(unsigned ctrl_id) override;
     void Msg_ProgressChange(unsigned ctrl_id, unsigned short position) override;
+    void Msg_OptionGroupChange(unsigned ctrl_id, unsigned selection) override;
+    void Msg_Timer(unsigned ctrl_id) override;
 
     void UpdateTexts();
     void Msg_PaintBefore() override;
+    bool IsPlayerSelectionEnabled() const;
+    bool IsSelectedPlayerLocal() const;
+    Extent GetToolsContentOffset() const;
+    void AddPlayerSelection();
+    void DrawPlayerSelection();
 };

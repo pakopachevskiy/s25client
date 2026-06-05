@@ -27,18 +27,28 @@ public:
 private:
     const GameWorldViewer& gwv;
     GameCommandFactory& gcFactory;
+    unsigned selectedPlayerId;
+    unsigned numPlayingPlayers;
 
-    /// Updatet die Steuerelemente mit den übergebenen Einstellungen
+    /// Updates the controls with the given settings
     void UpdateSettings(const Distributions& distribution);
     void UpdateSettings() override;
-    /// Sendet veränderte Einstellungen (an den Client), falls sie verändert wurden
+    /// Sends changed settings to the client if they were modified
     void TransmitSettings() override;
 
+    void Draw_() override;
     void Msg_Group_ProgressChange(unsigned group_id, unsigned ctrl_id, unsigned short position) override;
     void Msg_ButtonClick(unsigned ctrl_id) override;
+    void Msg_OptionGroupChange(unsigned ctrl_id, unsigned selection) override;
+    void Msg_Timer(unsigned ctrl_id) override;
 
     /// Groups for the settings
     std::vector<DistributionGroup> groups;
     /// Initialize the groups structure
     void CreateGroups();
+    bool IsPlayerSelectionEnabled() const;
+    bool IsSelectedPlayerLocal() const;
+    Extent GetDistributionContentOffset() const;
+    void AddPlayerSelection();
+    void DrawPlayerSelection();
 };
