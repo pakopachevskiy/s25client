@@ -391,6 +391,40 @@ namespace {
         }
         return nullptr;
     }
+
+    std::vector<const noFlag*> FindLandRoadFlagsAtSegmentDistance(const noFlag& start, const unsigned segmentDistance)
+    {
+        std::vector<const noFlag*> currentFlags{&start};
+        std::vector<const noFlag*> visitedFlags{&start};
+
+        for(unsigned distance = 0; distance < segmentDistance; ++distance)
+        {
+            std::vector<const noFlag*> nextFlags;
+            for(const noFlag* flag : currentFlags)
+            {
+                for(const Direction dir : helpers::EnumRange<Direction>{})
+                {
+                    const RoadSegment* segment = flag->GetRoute(dir);
+                    if(!segment || segment->GetRoadType() == RoadType::Water)
+                        continue;
+
+                    const noRoadNode* otherNode = segment->GetF1() == flag ? segment->GetF2() : segment->GetF1();
+                    const noFlag* otherFlag = dynamic_cast<const noFlag*>(otherNode);
+                    if(!otherFlag || otherFlag->GetPlayer() != start.GetPlayer()
+                       || helpers::contains(visitedFlags, otherFlag) || helpers::contains(nextFlags, otherFlag))
+                    {
+                        continue;
+                    }
+                    nextFlags.push_back(otherFlag);
+                }
+            }
+
+            currentFlags = std::move(nextFlags);
+            visitedFlags.insert(visitedFlags.end(), currentFlags.begin(), currentFlags.end());
+        }
+
+        return currentFlags;
+    }
 } // namespace
 
 std::vector<const noFlag*> AIConstruction::FindFlags(const MapPoint pt, unsigned short radius)
@@ -1105,9 +1139,9 @@ bool AIConstruction::BuildAlternativeRoadNearWarehouse(std::vector<Direction>& r
 {
     route.clear();
 
-    constexpr unsigned short maxSourceFlagSearchRadius = 10;
     constexpr unsigned short maxTargetFlagSearchRadius = 10;
     constexpr unsigned maxNewRoadLength = 24;
+    constexpr unsigned sourceFlagRoadSegmentDistance = 2;
 
     std::vector<const noFlag*> sourceFlags;
     for(const nobBaseWarehouse* warehouse : aii.GetStorehouses())
@@ -1123,17 +1157,9 @@ bool AIConstruction::BuildAlternativeRoadNearWarehouse(std::vector<Direction>& r
         if(!frontFlag || frontFlag->GetPlayer() != aii.GetPlayerId())
             continue;
 
-        sourceFlags.push_back(frontFlag);
-
-        const std::vector<const noFlag*> nearbyFlags = FindFlags(frontFlag->GetPos(), maxSourceFlagSearchRadius);
-        for(const noFlag* nearbyFlag : nearbyFlags)
-        {
-            if(nearbyFlag && nearbyFlag != frontFlag)
-            {
-                sourceFlags.push_back(nearbyFlag);
-                break;
-            }
-        }
+        const std::vector<const noFlag*> distantFlags =
+          FindLandRoadFlagsAtSegmentDistance(*frontFlag, sourceFlagRoadSegmentDistance);
+        sourceFlags.insert(sourceFlags.end(), distantFlags.begin(), distantFlags.end());
     }
     helpers::makeUniqueStable(sourceFlags);
 

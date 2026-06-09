@@ -769,25 +769,27 @@ BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoadNearWarehouse_BuildsBestConnectivity
     ScopedRoadRouteBQPenalty disableRoadBQPenalty(0.0);
     SetAllOwned(world);
 
-    const MapPoint sourceFlagPos = world.GetNeighbour(hqPos, Direction::SouthEast);
-    const std::vector<Direction> longRoute{Direction::SouthEast, Direction::East, Direction::NorthEast,
-                                           Direction::SouthEast, Direction::East, Direction::NorthEast,
-                                           Direction::SouthEast, Direction::East, Direction::NorthEast};
-    const MapPoint targetFlagPos = GetRouteEnd(world, sourceFlagPos, longRoute);
-    this->BuildRoad(sourceFlagPos, false, longRoute);
+    const MapPoint hqFlagPos = world.GetNeighbour(hqPos, Direction::SouthEast);
+    const std::vector<Direction> firstRoute{Direction::SouthEast, Direction::East, Direction::NorthEast};
+    const MapPoint middleFlagPos = GetRouteEnd(world, hqFlagPos, firstRoute);
+    const std::vector<Direction> secondRoute{Direction::SouthEast, Direction::East, Direction::NorthEast,
+                                             Direction::SouthEast, Direction::East, Direction::NorthEast};
+    const MapPoint sourceFlagPos = GetRouteEnd(world, middleFlagPos, secondRoute);
+    this->BuildRoad(hqFlagPos, false, firstRoute);
+    this->BuildRoad(middleFlagPos, false, secondRoute);
 
     const noFlag* sourceFlag = world.GetSpecObj<noFlag>(sourceFlagPos);
-    const noFlag* targetFlag = world.GetSpecObj<noFlag>(targetFlagPos);
+    const noFlag* middleFlag = world.GetSpecObj<noFlag>(middleFlagPos);
     BOOST_TEST_REQUIRE(sourceFlag);
-    BOOST_TEST_REQUIRE(targetFlag);
-    const RoadSegment* oldRoad = sourceFlag->GetRoute(longRoute.front());
+    BOOST_TEST_REQUIRE(middleFlag);
+    const RoadSegment* oldRoad = middleFlag->GetRoute(secondRoute.front());
     BOOST_TEST_REQUIRE(oldRoad);
 
     AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
     std::vector<Direction> route;
     BOOST_TEST_REQUIRE(ai.GetConstruction().BuildAlternativeRoadNearWarehouse(route));
-    BOOST_TEST(route.size() < longRoute.size());
-    BOOST_TEST(route.front() != longRoute.front());
+    BOOST_TEST(route.size() < firstRoute.size() + secondRoute.size());
+    BOOST_TEST(route.front() != secondRoute.back() + 3u);
 
     auto commands = ai.FetchGameCommands();
     BOOST_TEST_REQUIRE(commands.size() == 1u);
@@ -815,11 +817,13 @@ BOOST_FIXTURE_TEST_CASE(BuildAlternativeRoadNearWarehouse_RunGFUses5000GFCadence
     ScopedRoadRouteBQPenalty disableRoadBQPenalty(0.0);
     SetAllOwned(world);
 
-    const MapPoint sourceFlagPos = world.GetNeighbour(hqPos, Direction::SouthEast);
-    const std::vector<Direction> longRoute{Direction::SouthEast, Direction::East, Direction::NorthEast,
-                                           Direction::SouthEast, Direction::East, Direction::NorthEast,
-                                           Direction::SouthEast, Direction::East, Direction::NorthEast};
-    this->BuildRoad(sourceFlagPos, false, longRoute);
+    const MapPoint hqFlagPos = world.GetNeighbour(hqPos, Direction::SouthEast);
+    const std::vector<Direction> firstRoute{Direction::SouthEast, Direction::East, Direction::NorthEast};
+    const MapPoint middleFlagPos = GetRouteEnd(world, hqFlagPos, firstRoute);
+    const std::vector<Direction> secondRoute{Direction::SouthEast, Direction::East, Direction::NorthEast,
+                                             Direction::SouthEast, Direction::East, Direction::NorthEast};
+    this->BuildRoad(hqFlagPos, false, firstRoute);
+    this->BuildRoad(middleFlagPos, false, secondRoute);
 
     AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);
     for(unsigned gf = 1; gf <= 10; ++gf)
