@@ -292,7 +292,7 @@ bool GlobalPositionFinder::CheckProximity(const BuildingType type, const MapPoin
         if(proximity.enabled)
         {
             const unsigned minRadius = static_cast<unsigned>(CALC::calcCount(buildingCount, proximity.minimal));
-            if(otherType == BuildingType::Storehouse)
+            if(otherType == BuildingType::Headquarters || otherType == BuildingType::Storehouse)
             {
                 if(construction.OtherStoreInRadius(pt, minRadius))
                     return false;

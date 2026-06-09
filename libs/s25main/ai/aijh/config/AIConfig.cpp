@@ -39,6 +39,8 @@ TroopsDistributionConfig::TroopsDistributionConfig()
 
 AIConfig::AIConfig()
 {
+    wantedParams[BuildingType::Storehouse].priorityInc = 3;
+
     auto setResourceRating = [this](const BuildingType type, const AIResource resource, const unsigned defaultRadius,
                                     const int defaultMultiplier) {
         locationParams[type].resourceRating.enabled = true;

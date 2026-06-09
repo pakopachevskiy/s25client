@@ -26,6 +26,9 @@ Behaviour driven by these knobs is documented in:
 
 - `wantedParams[BuildingType]` – Desired counts and production weights that the
   planner uses to decide whether another building of a given type is needed.
+  `priorityInc` controls how quickly queued global build jobs of that type gain
+  priority each construction cycle; the default is `1`, except `Storehouse`
+  defaults to `3`.
 - `locationParams[BuildingType]` – Position-finding weights that rate how
   attractive a potential site is (terrain access, distance modifiers, etc.).
   Includes `resources` thresholds for minimal required AI resource values per

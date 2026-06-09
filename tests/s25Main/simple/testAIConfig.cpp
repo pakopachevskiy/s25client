@@ -23,6 +23,14 @@ BOOST_AUTO_TEST_CASE(MaxBuildingSites_DefaultsToForty)
     BOOST_TEST(config.builderAdvance.constant == 1.0);
 }
 
+BOOST_AUTO_TEST_CASE(WantedParams_PriorityIncDefaultsToOne)
+{
+    const AIConfig config;
+    BOOST_TEST(config.wantedParams[BuildingType::Sawmill].priorityInc == 1u);
+    BOOST_TEST(config.wantedParams[BuildingType::Quarry].priorityInc == 1u);
+    BOOST_TEST(config.wantedParams[BuildingType::Storehouse].priorityInc == 3u);
+}
+
 BOOST_AUTO_TEST_CASE(SmartForest_DefaultsAreEnabled)
 {
     const AIConfig config;
@@ -145,6 +153,25 @@ BOOST_AUTO_TEST_CASE(MaxBuildingSites_CanBeParsed)
     BOOST_TEST(config.maxBuildingSites == 17u);
     BOOST_TEST(config.builderAdvance.constant == 3.0);
     BOOST_TEST(config.builderAdvance.linear == 0.5);
+}
+
+BOOST_AUTO_TEST_CASE(WantedParams_PriorityIncCanBeParsed)
+{
+    const std::string configPath = "/tmp/rttr-ai-priority-inc.yaml";
+    {
+        std::ofstream out(configPath);
+        BOOST_TEST_REQUIRE(out.good());
+        out << "buildPlanner:\n";
+        out << "  Sawmill:\n";
+        out << "    priorityInc: 5\n";
+    }
+
+    AIConfig config;
+    applyWeightsCfg(configPath, config);
+
+    BOOST_TEST(config.wantedParams[BuildingType::Sawmill].priorityInc == 5u);
+    BOOST_TEST(config.wantedParams[BuildingType::Quarry].priorityInc == 1u);
+    BOOST_TEST(config.wantedParams[BuildingType::Storehouse].priorityInc == 3u);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

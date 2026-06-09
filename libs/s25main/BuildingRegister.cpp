@@ -115,28 +115,28 @@ void BuildingRegister::Remove(noBuilding* bld, BuildingType bldType)
     }
 }
 
-/// Gibt Liste von Gebäuden des Spieler zurück
+/// Returns the player's building list.
 const std::list<nobUsual*>& BuildingRegister::GetBuildings(const BuildingType type) const
 {
     RTTR_Assert(BuildingProperties::IsUsual(type));
     return buildings[type];
 }
 
-/// Liefert die Anzahl aller Gebäude einzeln
+/// Returns per-type counts for all buildings.
 BuildingCount BuildingRegister::GetBuildingNums() const
 {
     BuildingCount bc{};
 
-    // Normale Gebäude zählen
+    // Count usual buildings.
     for(const auto bld : helpers::enumRange<BuildingType>())
         bc.buildings[bld] = buildings[bld].size();
-    // Lagerhäuser zählen
+    // Count warehouses.
     for(const nobBaseWarehouse* bld : warehouses)
         ++bc.buildings[bld->GetBuildingType()];
-    // Militärgebäude zählen
+    // Count military buildings.
     for(const nobMilitary* bld : military_buildings)
         ++bc.buildings[bld->GetBuildingType()];
-    // Baustellen zählen
+    // Count building sites.
     for(const noBuildingSite* bld : building_sites)
         ++bc.buildingSites[bld->GetBuildingType()];
     return bc;

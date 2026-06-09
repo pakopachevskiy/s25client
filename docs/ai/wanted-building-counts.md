@@ -36,8 +36,11 @@ buildingsWanted[type] - GetNumBuildings(type)
 execution wave. A non-military build job is allowed only while current orders
 are below the missing count.
 
-Military buildings and `Storehouse` do not use this per-type missing-count
-check. They call `BuildingPlanner::WantMoreMilitaryBlds()` instead.
+Military buildings and most `Storehouse` requests do not use this per-type
+missing-count check. `Storehouse` is always wanted while `GetStorehouses()`
+contains no warehouse beyond headquarters and there is no active storehouse
+site; after that, it calls `BuildingPlanner::WantMoreMilitaryBlds()` like
+military buildings.
 
 ## Update Flow
 

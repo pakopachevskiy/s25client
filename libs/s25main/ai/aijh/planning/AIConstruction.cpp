@@ -128,6 +128,7 @@ void AIConstruction::ExecuteJobs(unsigned limit)
     {
         const ScopedAIRuntimeProfile globalBuildJobsProfile(AIRuntimeProfileSection::ExecuteGlobalBuildJobs,
                                                             initglobaljobs);
+        std::vector<BuildJob> deferredGlobalBuildJobs;
         for(unsigned i = 0; processed < limit && !globalBuildJobs.empty() && i < initglobaljobs; i++)
         {
             auto job = PopGlobalBuildJob();
@@ -140,7 +141,7 @@ void AIConstruction::ExecuteJobs(unsigned limit)
                 {
                     job->DecreasePriority(failReason == BuildJobFailReason::Shortage ? 2u : 40u);
                     job->ResetForRetry();
-                    globalBuildJobs.emplace(std::move(*job));
+                    deferredGlobalBuildJobs.emplace_back(std::move(*job));
                 }
                 processed++;
             } else if(job->GetState() == JobState::Finished)
@@ -148,14 +149,17 @@ void AIConstruction::ExecuteJobs(unsigned limit)
                 processed++;
             } else
             {
-                globalBuildJobs.emplace(std::move(*job));
+                deferredGlobalBuildJobs.emplace_back(std::move(*job));
             }
         }
+
+        for(BuildJob& job : deferredGlobalBuildJobs)
+            globalBuildJobs.emplace(std::move(job));
 
         std::multiset<BuildJob, CompareByPriority> reprioritizedGlobalBuildJobs;
         for(BuildJob job : globalBuildJobs)
         {
-            job.IncreasePriority(1);
+            job.IncreasePriority(aijh.GetConfig().wantedParams[job.GetType()].priorityInc);
             reprioritizedGlobalBuildJobs.emplace(std::move(job));
         }
         globalBuildJobs = std::move(reprioritizedGlobalBuildJobs);
@@ -793,6 +797,17 @@ bool AIConstruction::Wanted(BuildingType type) const
         return false;
     if(type == BuildingType::Catapult && !aii.CanBuildCatapult())
         return false;
+    if(type == BuildingType::Storehouse)
+    {
+        const auto hasWarehouseBeyondHeadquarters = [](const nobBaseWarehouse* warehouse) {
+            return warehouse && warehouse->GetBuildingType() != BuildingType::Headquarters;
+        };
+        if(!std::any_of(aii.GetStorehouses().begin(), aii.GetStorehouses().end(), hasWarehouseBeyondHeadquarters)
+           && bldPlanner.GetNumBuildingSites(BuildingType::Storehouse) == 0)
+        {
+            return true;
+        }
+    }
     if(BuildingProperties::IsMilitary(type) || type == BuildingType::Storehouse)
         return bldPlanner.WantMoreMilitaryBlds(aijh, GetNumMilitaryConstructionOrders());
     if(type == BuildingType::Sawmill && bldPlanner.GetNumBuildings(BuildingType::Sawmill) > 1)

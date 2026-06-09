@@ -216,6 +216,9 @@ WantedParams Weights::parseWantedParams(const YAML::Node& node, WantedParams par
     if(node["max"])
         params.max = static_cast<unsigned>(node["max"].as<double>());
 
+    if(node["priorityInc"])
+        params.priorityInc = static_cast<unsigned>(node["priorityInc"].as<double>());
+
     if(node["minProductivity"])
         params.minProductivity = static_cast<unsigned>(node["minProductivity"].as<double>());
 

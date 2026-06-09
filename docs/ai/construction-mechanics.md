@@ -60,8 +60,11 @@ See also:
 - Local build jobs and connect jobs that report `JobState::Finished` or `JobState::Failed`
   drop out; everything else is requeued at the back so transient blockers retry later.
 - Global jobs live in an ordered multiset. Before a global job runs, its priority is decreased
-  by 1. After the global-job cycle, every queued global job gains 1 priority, so jobs that
-  were not selected gradually rise relative to recently attempted work.
+  by 1. Global jobs that need another attempt are held aside until the current global-job cycle
+  ends, so they cannot be selected repeatedly ahead of lower-priority queued jobs in the same
+  cycle. After the global-job cycle, every queued global job gains the building type's configured
+  `wantedParams.priorityInc` value, defaulting to 1 except for `Storehouse`, which defaults to 3,
+  so jobs that were not selected gradually rise relative to recently attempted work.
 - Global `BuildJob` failures carry a `BuildJobFailReason`. `NotWanted` jobs are dropped.
   `Shortage` jobs, such as active-site-cap or construction-material blockers, are requeued
   with an additional 2-point priority penalty. `NoValidPosition` jobs are requeued with an
