@@ -132,6 +132,13 @@ platform support, and optional sanitizers for development builds.
 - [Statistics logging](ai/statistics-logging.md) – AIPlayerJH stats collection
   and outputs.
 
+### UI
+
+- [Map highlights](ui/highlights.md) – Hover and selection overlays drawn by
+  the game-world view.
+- [Figure rendering](ui/figure-rendering.md) – Map figure draw order, sprite
+  archives, and runtime sprite caches.
+
 ### Development And Tools
 
 - [Code coverage](development/code-coverage.md) – Coverage expectations and

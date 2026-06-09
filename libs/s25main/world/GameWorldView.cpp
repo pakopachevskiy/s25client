@@ -24,9 +24,11 @@
 #include "ogl/glFont.h"
 #include "ogl/glSmartBitmap.h"
 #include "world/GameWorldBase.h"
+#include "world/GameWorld.h"
 #include "world/GameWorldViewer.h"
 #include "gameTypes/RoadBuildState.h"
 #include "gameData/BuildingConsts.h"
+#include "gameData/BuildingProperties.h"
 #include "gameData/GuiConsts.h"
 #include "gameData/MapConsts.h"
 #include "s25util/error.h"
@@ -39,9 +41,10 @@
 #include <sstream>
 
 GameWorldView::GameWorldView(const GameWorldViewer& gwv, const Position& pos, const Extent& size)
-    : selPt(0, 0), show_bq(SETTINGS.ingame.showBQ), show_names(SETTINGS.ingame.showNames),
-      show_productivity(SETTINGS.ingame.showProductivity), offset(0, 0), lastOffset(0, 0), gwv(gwv), origin_(pos),
-      size_(size), zoomFactor_(1.f), targetZoomFactor_(1.f), zoomSpeed_(0.f)
+    : selPt(0, 0), protectedBuildingsHighlightSource(MapPoint::Invalid()), show_bq(SETTINGS.ingame.showBQ),
+      show_names(SETTINGS.ingame.showNames), show_productivity(SETTINGS.ingame.showProductivity), offset(0, 0),
+      lastOffset(0, 0), gwv(gwv), origin_(pos), size_(size), zoomFactor_(1.f), targetZoomFactor_(1.f),
+      zoomSpeed_(0.f)
 {
     updateEffectiveZoomFactor();
     MoveBy({0, 0});
@@ -245,6 +248,31 @@ void GameWorldView::DrawGUI(const RoadBuildState& rb, const TerrainRenderer& ter
             if(workerRadius > 0)
                 workerRadiusCenter = selPt;
         }
+
+        const auto* military = dynamic_cast<const nobMilitary*>(building);
+        if(!military)
+        {
+            protectedBuildingsHighlightSource = MapPoint::Invalid();
+            protectedBuildingsHighlightPts.clear();
+        } else if(protectedBuildingsHighlightSource != selPt)
+        {
+            protectedBuildingsHighlightSource = selPt;
+            protectedBuildingsHighlightPts.clear();
+
+            const auto* world = dynamic_cast<const GameWorld*>(&GetWorld());
+            if(world)
+            {
+                for(const noBaseBuilding* protectedBuilding : world->GetBuildingObjectsLostOnCapture(*military))
+                {
+                    if(!BuildingProperties::IsMilitary(protectedBuilding->GetBuildingType()))
+                        protectedBuildingsHighlightPts.push_back(protectedBuilding->GetPos());
+                }
+            }
+        }
+    } else if(protectedBuildingsHighlightSource.isValid())
+    {
+        protectedBuildingsHighlightSource = MapPoint::Invalid();
+        protectedBuildingsHighlightPts.clear();
     }
 
     // Falls im Straßenbaumodus: Punkte um den aktuellen Straßenbaupunkt herum ermitteln
@@ -274,6 +302,14 @@ void GameWorldView::DrawGUI(const RoadBuildState& rb, const TerrainRenderer& ter
                && gwv.GetVisibility(curPt) == Visibility::Visible
                && GetWorld().CalcDistance(workerRadiusCenter, curPt) <= workerRadius)
                 LOADER.GetMapTexture(20)->DrawFull(curPos, SetAlpha(COLOR_GREEN, 0x55));
+
+            if(!protectedBuildingsHighlightPts.empty() && gwv.GetVisibility(curPt) == Visibility::Visible
+               && helpers::contains(protectedBuildingsHighlightPts, curPt))
+            {
+                const auto* protectedBuilding = GetWorld().GetSpecObj<noBaseBuilding>(curPt);
+                if(protectedBuilding)
+                    protectedBuilding->GetBuildingImage().DrawFull(curPos, SetAlpha(COLOR_GREEN, 0x66));
+            }
 
             /// Current point indicated by Mouse
             if(drawMouse && selPt == curPt)

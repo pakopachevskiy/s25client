@@ -123,6 +123,8 @@ public:
     bool DoesDestructionChangeTerritory(const noBaseBuilding& building) const;
     /// Return the building types that would be destroyed if the given military building were captured
     std::vector<BuildingType> GetBuildingsLostOnCapture(const nobMilitary& building) const;
+    /// Return the buildings that would be destroyed if the given military building were captured
+    std::vector<const noBaseBuilding*> GetBuildingObjectsLostOnCapture(const nobMilitary& building) const;
     /// Estimate how many buildings would be destroyed if the given military building were captured
     unsigned CountBuildingsLostOnCapture(const nobMilitary& building) const;
     /// Invalidate cached capture-loss analysis for military buildings near the given point

@@ -623,6 +623,17 @@ void GameWorld::InvalidateBuildingsLostOnCaptureCachesAround(const MapPoint pt)
 
 std::vector<BuildingType> GameWorld::GetBuildingsLostOnCapture(const nobMilitary& building) const
 {
+    const std::vector<const noBaseBuilding*> destroyedBuildings = GetBuildingObjectsLostOnCapture(building);
+    std::vector<BuildingType> destroyedBuildingTypes;
+    destroyedBuildingTypes.reserve(destroyedBuildings.size());
+    for(const noBaseBuilding* buildingCandidate : destroyedBuildings)
+        destroyedBuildingTypes.push_back(buildingCandidate->GetBuildingType());
+
+    return destroyedBuildingTypes;
+}
+
+std::vector<const noBaseBuilding*> GameWorld::GetBuildingObjectsLostOnCapture(const nobMilitary& building) const
+{
     const unsigned militaryRadius = building.GetMilitaryRadius();
     if(militaryRadius == 0u)
         return {};
@@ -696,12 +707,12 @@ std::vector<BuildingType> GameWorld::GetBuildingsLostOnCapture(const nobMilitary
             destroyedCandidates.insert(baseBuilding);
     }
 
-    std::vector<BuildingType> destroyedBuildingTypes;
-    destroyedBuildingTypes.reserve(destroyedCandidates.size());
+    std::vector<const noBaseBuilding*> destroyedBuildings;
+    destroyedBuildings.reserve(destroyedCandidates.size());
     for(const noBaseBuilding* buildingCandidate : destroyedCandidates)
-        destroyedBuildingTypes.push_back(buildingCandidate->GetBuildingType());
+        destroyedBuildings.push_back(buildingCandidate);
 
-    return destroyedBuildingTypes;
+    return destroyedBuildings;
 }
 
 TerritoryRegion GameWorld::CreateTerritoryRegion(const noBaseBuilding& building, unsigned radius,

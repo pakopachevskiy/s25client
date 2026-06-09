@@ -34,6 +34,10 @@ class GameWorldView
     MapPoint selPt;
     /// Offset to selected point
     Position selPtOffset;
+    /// Military building currently used for protected-building hover highlighting
+    MapPoint protectedBuildingsHighlightSource;
+    /// Building positions protected by protectedBuildingsHighlightSource
+    std::vector<MapPoint> protectedBuildingsHighlightPts;
 
     /// Callbacks called when node is printed
     std::vector<IDrawNodeCallback*> drawNodeCallbacks;
