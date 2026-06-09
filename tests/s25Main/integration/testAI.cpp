@@ -224,6 +224,22 @@ BOOST_FIXTURE_TEST_CASE(AIChat, EmptyWorldFixture2P)
     }
 }
 
+BOOST_FIXTURE_TEST_CASE(GlobalBuildJobs_SkipBelowMinimumPriority, EmptyWorldFixture1P)
+{
+    AIJH::AIPlayerJH ai(0, world, AI::Level::Hard);
+    auto job =
+      std::make_unique<AIJH::BuildJob>(ai, BuildingType::Woodcutter, MapPoint::Invalid(), AIJH::SearchMode::Global);
+    job->priority = 8999;
+
+    AIJH::AIConstruction& construction = ai.GetConstruction();
+    construction.AddGlobalBuildJob(std::move(job));
+    construction.ExecuteJobs(1);
+
+    const auto skippedJob = construction.PopGlobalBuildJob();
+    BOOST_REQUIRE(skippedJob);
+    BOOST_TEST(skippedJob->priority == 9000u);
+}
+
 BOOST_FIXTURE_TEST_CASE(PointRating_IsUnavailableForUnsuitableNode, WorldWithGCExecution<1>)
 {
     AIJH::AIPlayerJH ai(curPlayer, world, AI::Level::Hard);

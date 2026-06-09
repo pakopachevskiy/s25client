@@ -44,6 +44,8 @@
 
 namespace AIJH {
 
+constexpr unsigned minGlobalBuildJobPriority = 9000;
+
 AIConstruction::AIConstruction(AIPlanningContext& aijh)
     : aijh(aijh), aii(aijh.GetInterface()), bldPlanner(aijh.GetBldPlanner())
 {
@@ -131,6 +133,9 @@ void AIConstruction::ExecuteJobs(unsigned limit)
         std::vector<BuildJob> deferredGlobalBuildJobs;
         for(unsigned i = 0; processed < limit && !globalBuildJobs.empty() && i < initglobaljobs; i++)
         {
+            if(globalBuildJobs.begin()->priority < minGlobalBuildJobPriority)
+                break;
+
             auto job = PopGlobalBuildJob();
             job->DecreasePriority(1);
             job->ExecuteJob();
@@ -235,6 +240,15 @@ std::unique_ptr<BuildJob> AIConstruction::GetBuildJob()
     std::unique_ptr<BuildJob> job = std::move(buildJobs.front());
     buildJobs.pop_front();
     return job;
+}
+
+std::vector<std::pair<BuildingType, unsigned>> AIConstruction::GetGlobalBuildJobs() const
+{
+    std::vector<std::pair<BuildingType, unsigned>> result;
+    result.reserve(globalBuildJobs.size());
+    for(const BuildJob& job : globalBuildJobs)
+        result.emplace_back(job.GetType(), job.priority);
+    return result;
 }
 
 void AIConstruction::AddConnectFlagJob(const noFlag* flag)

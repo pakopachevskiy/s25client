@@ -153,6 +153,8 @@ platform support, and optional sanitizers for development builds.
 - [Building and site rendering](development/building-and-construction-site-rendering.md)
   – How finished building sprites, construction progress, and fog-of-war
   building memories are drawn.
+- [AI debug overlays overview](development/ai-debug-overlays-overview.md) –
+  Summary of AI Debug window overlay ids, rendering paths, and data sources.
 - [BuildQuality AI debug overlay rendering](development/buildquality-ai-debug-overlay-rendering.md)
   – How the AI Debug window draws cached build-quality icons over map nodes.
 - [Tree and granite rendering](development/tree-and-granite-rendering.md) –

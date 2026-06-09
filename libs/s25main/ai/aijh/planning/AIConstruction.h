@@ -13,6 +13,7 @@
 #include <deque>
 #include <memory>
 #include <set>
+#include <utility>
 #include <vector>
 
 class AIInterface;
@@ -51,6 +52,7 @@ public:
     std::unique_ptr<BuildJob> GetBuildJob();
     unsigned GetBuildJobNum() const { return buildJobs.size(); }
     unsigned GetConnectJobNum() const { return connectJobs.size(); }
+    std::vector<std::pair<BuildingType, unsigned>> GetGlobalBuildJobs() const;
 
     void AddConnectFlagJob(const noFlag* flag);
 

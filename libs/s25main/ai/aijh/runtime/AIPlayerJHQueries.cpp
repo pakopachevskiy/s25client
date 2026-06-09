@@ -4,6 +4,7 @@
 
 #include "AIPlayerJH.h"
 
+#include "ai/aijh/planning/AIConstruction.h"
 #include "ai/aijh/planning/BuildingPlanner.h"
 #include "ai/aijh/planning/GlobalPositionFinder.h"
 #include "ai/aijh/runtime/AIRoadWorkload.h"
@@ -89,6 +90,11 @@ std::optional<int> AIPlayerJH::GetPointRating(const BuildingType type, const Map
 boost::optional<unsigned> AIPlayerJH::GetNumBuildingsWanted(const BuildingType type) const
 {
     return bldPlanner->GetNumBuildingsWanted(type);
+}
+
+std::vector<std::pair<BuildingType, unsigned>> AIPlayerJH::GetGlobalBuildJobs() const
+{
+    return construction->GetGlobalBuildJobs();
 }
 
 std::optional<unsigned> AIPlayerJH::GetRoadWorkload(const MapPoint pt) const

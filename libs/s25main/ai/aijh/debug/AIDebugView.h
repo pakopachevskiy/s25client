@@ -12,6 +12,8 @@
 #include <boost/optional/optional.hpp>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace AIJH {
 
@@ -29,6 +31,7 @@ public:
     virtual int GetResourceValueForDebug(MapPoint pt, AIResource res) const = 0;
     virtual std::optional<int> GetPointRating(BuildingType type, MapPoint pt) const = 0;
     virtual boost::optional<unsigned> GetNumBuildingsWanted(BuildingType type) const = 0;
+    virtual std::vector<std::pair<BuildingType, unsigned>> GetGlobalBuildJobs() const = 0;
     virtual std::optional<unsigned> GetRoadWorkload(MapPoint pt) const = 0;
 };
 

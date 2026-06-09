@@ -64,7 +64,9 @@ See also:
   ends, so they cannot be selected repeatedly ahead of lower-priority queued jobs in the same
   cycle. After the global-job cycle, every queued global job gains the building type's configured
   `wantedParams.priorityInc` value, defaulting to 1 except for `Storehouse`, which defaults to 3,
-  so jobs that were not selected gradually rise relative to recently attempted work.
+  so jobs that were not selected gradually rise relative to recently attempted work. The cycle
+  skips global jobs below priority `9000`; skipped jobs still receive the per-type priority
+  increase and become eligible again after recovering to the threshold.
 - Global `BuildJob` failures carry a `BuildJobFailReason`. `NotWanted` jobs are dropped.
   `Shortage` jobs, such as active-site-cap or construction-material blockers, are requeued
   with an additional 2-point priority penalty. `NoValidPosition` jobs are requeued with an

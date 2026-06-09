@@ -46,6 +46,7 @@ constexpr unsigned OVERLAY_POSITION_RATING = 13;
 constexpr unsigned OVERLAY_BUILDINGS_WANTED = 14;
 constexpr unsigned OVERLAY_INVENTORY = 15;
 constexpr unsigned OVERLAY_ROAD_WORKLOAD = 16;
+constexpr unsigned OVERLAY_GLOBAL_BUILD_QUEUE = 17;
 constexpr unsigned BUILDINGS_WANTED_DISABLED = std::numeric_limits<unsigned>::max();
 
 std::string GetPlayerStatus(const GamePlayer& player)
@@ -224,6 +225,7 @@ iwAIDebug::iwAIDebug(GameWorldView& gwv, const std::vector<const AIPlayer*>& ais
     overlays->AddString("Buildings wanted");
     overlays->AddString("Inventory");
     overlays->AddString("Road Workload");
+    overlays->AddString("Global Build Queue");
 
     buildingType = AddComboBox(ID_CbBuildingType, DrawPoint(15, 135), Extent(250, 20), TextureColor::Grey, NormalFont,
                                100);
@@ -346,6 +348,16 @@ void iwAIDebug::Msg_PaintBefore()
         const Inventory& inventory = aiPlayer->player.GetInventory();
         for(const auto& good : GetSortedGoodTypes())
             ss << good.first << ": " << inventory.goods[good.second] << std::endl;
+
+        SetTextIfChanged(*text, ss.str());
+        return;
+    }
+
+    if(printer->overlay == OVERLAY_GLOBAL_BUILD_QUEUE)
+    {
+        ss << "Global build queue:" << std::endl << std::endl;
+        for(const auto& job : printer->ai->GetGlobalBuildJobs())
+            ss << BUILDING_NAMES[job.first] << ": " << job.second << std::endl;
 
         SetTextIfChanged(*text, ss.str());
         return;
