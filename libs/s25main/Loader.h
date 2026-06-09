@@ -17,6 +17,7 @@
 #include "gameTypes/JobTypes.h"
 #include "gameTypes/Nation.h"
 #include "gameData/AnimalConsts.h"
+#include "libsiedler2/Archiv.h"
 #include <boost/filesystem/path.hpp>
 #include <array>
 #include <cstdint>
@@ -41,7 +42,6 @@ class SoundEffectItem;
 enum class AddonId;
 
 namespace libsiedler2 {
-class Archiv;
 class ArchivItem;
 class ArchivItem_Ini;
 class ArchivItem_Palette;
@@ -220,6 +220,7 @@ public:
 private:
     /// Load all sounds
     bool LoadSounds();
+    bool LoadAfricanCarrierResources(const libsiedler2::ArchivItem_Palette* palette);
 
     template<typename T>
     bool LoadImpl(const T& resIdOrPath, const libsiedler2::ArchivItem_Palette* palette);
@@ -230,7 +231,11 @@ private:
     std::unique_ptr<ArchiveLoader> archiveLoader_;
     std::map<ResourceId, FileEntry> files_;
     std::vector<glFont> fonts;
-    std::map<unsigned, std::unique_ptr<glArchivItem_Bitmap_Player>> africanCarrierAnimationImages_;
+    libsiedler2::Archiv africanJobsBob_;
+    libsiedler2::Archiv africanCarrierBob_;
+    libsiedler2::Archiv africanBoat_;
+    libsiedler2::Archiv africanRomBobs_;
+    libsiedler2::Archiv africanWineBobs_;
 
     bool isWinterGFX_;
     helpers::EnumArray<libsiedler2::Archiv*, Nation> nation_gfx;

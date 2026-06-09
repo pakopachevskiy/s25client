@@ -5,7 +5,6 @@
 #include "Loader.h"
 #include "PointOutput.h"
 #include "RttrForeachPt.h"
-#include "ogl/CarrierSkinRecolor.h"
 #include "ogl/glArchivItem_Bitmap_Player.h"
 #include "uiHelper/uiHelpers.hpp"
 #include <libsiedler2/ArchivItem_Bitmap_Player.h>
@@ -279,70 +278,6 @@ BOOST_AUTO_TEST_CASE(MultiPlayerBitmap)
             // LCOV_EXCL_STOP
         }
     }
-}
-
-BOOST_AUTO_TEST_CASE(CarrierSkinRecolorColorSelection)
-{
-    BOOST_TEST(carrierSkinRecolor::isCarrierSkinColor(0xFFDBC797u));
-    BOOST_TEST(carrierSkinRecolor::isCarrierSkinColor(0xFFBFA373u));
-    BOOST_TEST(carrierSkinRecolor::isCarrierSkinColor(0xFFA78353u));
-    BOOST_TEST(carrierSkinRecolor::isCarrierSkinColor(0xFFA49571u));
-    BOOST_TEST(carrierSkinRecolor::recolorCarrierSkin(0xFFBFA373u) == 0xFF5B2F13u);
-
-    const ColorBGRA darker(carrierSkinRecolor::recolorCarrierSkin(0xFFA78353u));
-    const ColorBGRA target(0xFF5B2F13u);
-    const ColorBGRA lighter(carrierSkinRecolor::recolorCarrierSkin(0xFFDBC797u));
-    BOOST_TEST(darker.getRed() < target.getRed());
-    BOOST_TEST(lighter.getRed() > target.getRed());
-
-    BOOST_TEST(!carrierSkinRecolor::isCarrierSkinColor(0xFF204060u));
-    BOOST_TEST(!carrierSkinRecolor::isCarrierSkinColor(0x00BFA373u));
-}
-
-BOOST_AUTO_TEST_CASE(CarrierSkinRecolorPreservesNonSkinPixels)
-{
-    ArchivItem_Palette pal;
-    pal.set(1, ColorRGB(0xDB, 0xC7, 0x97));
-    pal.set(2, ColorRGB(0xBF, 0xA3, 0x73));
-    pal.set(3, ColorRGB(0xA7, 0x83, 0x53));
-    pal.set(4, ColorRGB(0xA4, 0x95, 0x71));
-    pal.set(5, ColorRGB(0x20, 0x40, 0x60));
-    pal.set(128, ColorRGB(0x10, 0x20, 0x30));
-
-    PixelBufferBGRA buffer(7, 1);
-    buffer.set(0, 0, ColorBGRA(0xFFDBC797u));
-    buffer.set(1, 0, ColorBGRA(0xFFBFA373u));
-    buffer.set(2, 0, ColorBGRA(0xFFA78353u));
-    buffer.set(3, 0, ColorBGRA(0xFFA49571u));
-    buffer.set(4, 0, pal.get(128));
-    buffer.set(5, 0, ColorBGRA(0xFF204060u));
-
-    glArchivItem_Bitmap_Player bmp;
-    bmp.create(buffer, &pal);
-
-    auto recolored = carrierSkinRecolor::createAfricanCarrierSkin(bmp);
-    BOOST_TEST(recolored->getPixel(0, 0).asValue() != 0xFFDBC797u);
-    BOOST_TEST(recolored->getPixel(1, 0).asValue() == 0xFF5B2F13u);
-    BOOST_TEST(recolored->getPixel(2, 0).asValue() != 0xFFA78353u);
-    BOOST_TEST(recolored->getPixel(3, 0).asValue() != 0xFFA49571u);
-    BOOST_TEST(recolored->isPlayerColor(4, 0));
-    BOOST_TEST(recolored->getPlayerColorIdx(4, 0) == 0u);
-    BOOST_TEST(recolored->getPixel(5, 0).asValue() == 0xFF204060u);
-    BOOST_TEST(recolored->getPixel(6, 0).getAlpha() == 0u);
-}
-
-BOOST_AUTO_TEST_CASE(CarrierSkinRecolorConvertsPalettedSources)
-{
-    ArchivItem_Palette pal;
-    pal.set(1, ColorRGB(0xBF, 0xA3, 0x73));
-    std::array<uint8_t, 1> buffer{{1}};
-
-    glArchivItem_Bitmap_Player bmp;
-    bmp.create(buffer.data(), 1, 1, TextureFormat::Paletted, &pal);
-
-    auto recolored = carrierSkinRecolor::createAfricanCarrierSkin(bmp);
-    BOOST_TEST((recolored->getFormat() == TextureFormat::BGRA));
-    BOOST_TEST(recolored->getPixel(0, 0).asValue() == 0xFF5B2F13u);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

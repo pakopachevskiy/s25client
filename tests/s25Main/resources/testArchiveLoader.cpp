@@ -6,7 +6,9 @@
 #include "resources/ResolvedFile.h"
 #include "test/testConfig.h"
 #include "libsiedler2/Archiv.h"
+#include "libsiedler2/ArchivItem_Bitmap_Player.h"
 #include "libsiedler2/ArchivItem_Bitmap_Raw.h"
+#include "libsiedler2/ArchivItem_Palette.h"
 #include "libsiedler2/ArchivItem_Text.h"
 #include "libsiedler2/PixelBufferBGRA.h"
 #include "libsiedler2/libsiedler2.h"
@@ -103,6 +105,31 @@ static boost::test_tools::predicate_result compareTxts(const libsiedler2::Archiv
     return true;
 }
 
+static unsigned countPlayerBitmaps(const libsiedler2::Archiv& archive)
+{
+    unsigned result = 0;
+    for(const auto& item : archive)
+    {
+        if(dynamic_cast<const libsiedler2::ArchivItem_Bitmap_Player*>(item.get()))
+            ++result;
+        if(const auto* nestedArchive = dynamic_cast<const libsiedler2::Archiv*>(item.get()))
+            result += countPlayerBitmaps(*nestedArchive);
+    }
+    return result;
+}
+
+static libsiedler2::ArchivItem_Palette createTestPalette()
+{
+    libsiedler2::Archiv paletteArchive;
+    BOOST_TEST_REQUIRE(libsiedler2::Load(rttr::test::rttrBaseDir / "external/libsiedler2/tests/testFiles/pal5.act",
+                                         paletteArchive)
+                       == 0);
+
+    const auto* palette = dynamic_cast<const libsiedler2::ArchivItem_Palette*>(paletteArchive.get(0));
+    BOOST_TEST_REQUIRE(palette);
+    return *palette;
+}
+
 BOOST_AUTO_TEST_CASE(TestPredicate)
 {
     // Create archive of size 3 where first item is "1", second is empty and third is "20"
@@ -182,6 +209,26 @@ BOOST_AUTO_TEST_CASE(BobOverrides)
         BOOST_TEST(curBmp->getHeight() == 7);
     }
     // TODO: Test mapping merge. Can't be done ATM as it requires an actual bob file to override
+
+    // Avoid log cluttering
+    logAcc.clearLog();
+}
+
+BOOST_AUTO_TEST_CASE(AfricanCarrierSpriteFoldersLoad)
+{
+    rttr::test::LogAccessor logAcc;
+    ArchiveLoader loader(LOG);
+    const auto palette = createTestPalette();
+
+    const fs::path africanCarrierAssets = rttr::test::rttrBaseDir / "data/RTTR/assets/nations/Africans";
+    for(const char* folderName : {"afr_jobs.bob", "afr_carrier.bob", "afr_boat", "afr_rombobs", "afr_winebobs"})
+    {
+        const auto archive = loader.load(ResolvedFile{africanCarrierAssets / folderName}, &palette);
+        BOOST_TEST_CONTEXT(folderName)
+        {
+            BOOST_TEST(countPlayerBitmaps(archive) > 0u);
+        }
+    }
 
     // Avoid log cluttering
     logAcc.clearLog();

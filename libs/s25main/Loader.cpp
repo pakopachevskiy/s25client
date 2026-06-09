@@ -16,7 +16,6 @@
 #include "files.h"
 #include "helpers/EnumRange.h"
 #include "helpers/containerUtils.h"
-#include "ogl/CarrierSkinRecolor.h"
 #include "ogl/MusicItem.h"
 #include "ogl/SoundEffectItem.h"
 #include "ogl/glArchivItem_Bitmap_Player.h"
@@ -109,15 +108,11 @@ glArchivItem_Bitmap_Player* Loader::GetPlayerImage(const ResourceId& file, unsig
 glArchivItem_Bitmap_Player* Loader::GetCarrierAnimationImage(Nation nation, unsigned nr)
 {
     auto* const image = GetPlayerImage("rom_bobs", nr);
-    if(nation != Nation::Africans || !image)
+    if(nation != Nation::Africans)
         return image;
 
-    auto it = africanCarrierAnimationImages_.find(nr);
-    if(it == africanCarrierAnimationImages_.end())
-        it = africanCarrierAnimationImages_
-               .emplace(nr, carrierSkinRecolor::createAfricanCarrierSkin(*image))
-               .first;
-    return it->second.get();
+    auto* const africanImage = dynamic_cast<glArchivItem_Bitmap_Player*>(africanRomBobs_.get(nr));
+    return africanImage ? africanImage : image;
 }
 
 glFont* Loader::GetFont(FontSize size)
@@ -528,6 +523,9 @@ bool Loader::LoadFilesAtGame(const std::string& mapGfxPath, bool isWinterGFX, co
     if(!LoadResources({"wine_bobs"}))
         return false;
 
+    if(!LoadAfricanCarrierResources(pal5))
+        return false;
+
     const bfs::path mapGFXFile = config_.ExpandPath(mapGfxPath);
     if(!Load(mapGFXFile, pal5))
         return false;
@@ -536,6 +534,54 @@ bool Loader::LoadFilesAtGame(const std::string& mapGfxPath, bool isWinterGFX, co
     isWinterGFX_ = isWinterGFX;
 
     return true;
+}
+
+bool Loader::LoadAfricanCarrierResources(const libsiedler2::ArchivItem_Palette* palette)
+{
+    const bfs::path africanAssets = config_.ExpandPath(s25::folders::assetsNations) / NationNames[Nation::Africans];
+    const auto loadedResolvedFile = [&](const ResourceId& resourceId) {
+        const auto loadedFile = files_.find(resourceId);
+        return loadedFile != files_.end() ? loadedFile->second.resolvedFile : ResolvedFile();
+    };
+    const auto loadMergedAfricanResource = [&](libsiedler2::Archiv& target, ResolvedFile resolvedFile,
+                                               const std::string& resourceName,
+                                               const std::string& overrideName) {
+        if(!resolvedFile)
+        {
+            logger_.write(_("Failed to resolve resource %1%\n")) % resourceName;
+            return false;
+        }
+
+        const bfs::path overridePath = africanAssets / overrideName;
+        if(!bfs::exists(overridePath))
+        {
+            logger_.write(_("Failed to resolve resource %1%\n")) % overridePath;
+            return false;
+        }
+
+        resolvedFile.push_back(overridePath);
+        try
+        {
+            target = archiveLoader_->load(resolvedFile, palette);
+        } catch(const LoadError&)
+        {
+            return false;
+        }
+        return true;
+    };
+
+    namespace res = s25::resources;
+    return loadMergedAfricanResource(africanJobsBob_, loadedResolvedFile(ResourceId::make(bfs::path(res::jobs))),
+                                     res::jobs, "afr_jobs.bob")
+           && loadMergedAfricanResource(africanCarrierBob_,
+                                         loadedResolvedFile(ResourceId::make(bfs::path(res::carrier))), res::carrier,
+                                         "afr_carrier.bob")
+           && loadMergedAfricanResource(africanBoat_, loadedResolvedFile(ResourceId::make(bfs::path(res::boat))),
+                                         res::boat, "afr_boat")
+           && loadMergedAfricanResource(africanRomBobs_, loadedResolvedFile(ResourceId::make(bfs::path(res::rom_bobs))),
+                                         res::rom_bobs, "afr_rombobs")
+           && loadMergedAfricanResource(africanWineBobs_, loadedResolvedFile(ResourceId("wine_bobs")), "wine_bobs",
+                                         "afr_winebobs");
 }
 
 bool Loader::LoadFiles(const std::vector<std::string>& files)
@@ -622,6 +668,9 @@ void Loader::fillCaches()
     glArchivItem_Bob* bob_jobs = GetBob("jobs");
     if(!bob_jobs)
         throw std::runtime_error("jobs not found");
+    auto* const african_bob_jobs = dynamic_cast<glArchivItem_Bob*>(africanJobsBob_.get(0));
+    if(!african_bob_jobs)
+        throw std::runtime_error("african jobs not found");
 
     for(const auto nation : helpers::enumRange<Nation>())
     {
@@ -701,18 +750,14 @@ void Loader::fillCaches()
                     const auto& spriteData = JOB_SPRITE_CONSTS[Job(job)];
                     const libsiedler2::ImgDir imgDir = toImgDir(dir);
 
-                    auto* body =
-                      dynamic_cast<glArchivItem_Bitmap_Player*>(bob_jobs->getBody(spriteData.isFat(), imgDir, ani_step));
-                    if(nation == Nation::Africans && job == Job::Helper && body)
-                        bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
-                    else
-                        bmp.add(body);
+                    auto* const sourceBob = nation == Nation::Africans && job == Job::Helper ? african_bob_jobs : bob_jobs;
+
+                    auto* body = dynamic_cast<glArchivItem_Bitmap_Player*>(
+                      sourceBob->getBody(spriteData.isFat(), imgDir, ani_step));
+                    bmp.add(body);
                     auto* overlay = dynamic_cast<glArchivItem_Bitmap_Player*>(
-                      bob_jobs->getOverlay(spriteData.getBobId(Nation(nation)), spriteData.isFat(), imgDir, ani_step));
-                    if(nation == Nation::Africans && job == Job::Helper && overlay)
-                        bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*overlay));
-                    else
-                        bmp.add(overlay);
+                      sourceBob->getOverlay(spriteData.getBobId(Nation(nation)), spriteData.isFat(), imgDir, ani_step));
+                    bmp.add(overlay);
                     bmp.addShadow(GetMapImage(900 + static_cast<unsigned>(imgDir) * 8 + ani_step));
 
                     stp->add(bmp);
@@ -729,16 +774,13 @@ void Loader::fillCaches()
 
                 const libsiedler2::ImgDir imgDir = toImgDir(dir);
 
-                auto* body = dynamic_cast<glArchivItem_Bitmap_Player*>(bob_jobs->getBody(true, imgDir, ani_step));
-                if(nation == Nation::Africans && body)
-                    bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
-                else
-                    bmp.add(body);
-                auto* overlay = dynamic_cast<glArchivItem_Bitmap_Player*>(bob_jobs->getOverlay(0, true, imgDir, ani_step));
-                if(nation == Nation::Africans && overlay)
-                    bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*overlay));
-                else
-                    bmp.add(overlay);
+                auto* const sourceBob = nation == Nation::Africans ? african_bob_jobs : bob_jobs;
+
+                auto* body = dynamic_cast<glArchivItem_Bitmap_Player*>(sourceBob->getBody(true, imgDir, ani_step));
+                bmp.add(body);
+                auto* overlay =
+                  dynamic_cast<glArchivItem_Bitmap_Player*>(sourceBob->getOverlay(0, true, imgDir, ani_step));
+                bmp.add(overlay);
                 bmp.addShadow(GetMapImage(900 + static_cast<unsigned>(imgDir) * 8 + ani_step));
 
                 stp->add(bmp);
@@ -902,8 +944,9 @@ void Loader::fillCaches()
 
             africanBmp.reset();
 
-            if(body)
-                africanBmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
+            auto* africanBody =
+              dynamic_cast<glArchivItem_Bitmap_Player*>(africanBoat_.get(rttr::enum_cast(dir + 3u) * 8 + ani_step));
+            africanBmp.add(africanBody ? africanBody : body);
             africanBmp.addShadow(GetMapImage(2048 + rttr::enum_cast(dir) % 3));
 
             stp->add(africanBmp);
@@ -916,6 +959,9 @@ void Loader::fillCaches()
     glArchivItem_Bob* bob_carrier = GetBob("carrier");
     if(!bob_carrier)
         throw std::runtime_error("carrier not found");
+    auto* const african_bob_carrier = dynamic_cast<glArchivItem_Bob*>(africanCarrierBob_.get(0));
+    if(!african_bob_carrier)
+        throw std::runtime_error("african carrier not found");
 
     libsiedler2::Archiv wine_bob_carrier = GetArchive("wine_bobs");
 
@@ -933,49 +979,37 @@ void Loader::fillCaches()
 
                     const libsiedler2::ImgDir imgDir = toImgDir(dir);
                     const auto addCarrierLayers = [&](glSmartBitmap& bmp, const bool african) {
+                        auto* const carrierBob = african ? african_bob_carrier : bob_carrier;
+                        libsiedler2::Archiv& wineBobCarrier = african ? africanWineBobs_ : wine_bob_carrier;
+
                         bmp.reset();
 
                         if(ware == GoodType::Grapes)
                         {
                             const unsigned bodyIdx = static_cast<unsigned>(imgDir) * 8 + ani_step;
-                            auto* body = dynamic_cast<glArchivItem_Bitmap_Player*>(wine_bob_carrier.get(
+                            auto* body = dynamic_cast<glArchivItem_Bitmap_Player*>(wineBobCarrier.get(
                               wineaddon::bobIndex[fat ? wineaddon::BobTypes::FAT_CARRIER_CARRYING_GRAPES :
                                                         wineaddon::BobTypes::THIN_CARRIER_CARRYING_GRAPES]
                               + bodyIdx));
-                            if(african && body)
-                                bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
-                            else
-                                bmp.add(body);
+                            bmp.add(body);
                         } else if(ware == GoodType::Wine)
                         {
                             auto* body =
-                              dynamic_cast<glArchivItem_Bitmap_Player*>(bob_carrier->getBody(fat, imgDir, ani_step));
-                            if(african && body)
-                                bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
-                            else
-                                bmp.add(body);
-                            auto* overlay = dynamic_cast<glArchivItem_Bitmap_Player*>(wine_bob_carrier.get(
+                              dynamic_cast<glArchivItem_Bitmap_Player*>(carrierBob->getBody(fat, imgDir, ani_step));
+                            bmp.add(body);
+                            auto* overlay = dynamic_cast<glArchivItem_Bitmap_Player*>(wineBobCarrier.get(
                               wineaddon::bobIndex[fat ? wineaddon::BobTypes::FAT_CARRIER_CARRYING_WINE :
                                                         wineaddon::BobTypes::THIN_CARRIER_CARRYING_WINE]
                               + static_cast<unsigned>(imgDir)));
-                            if(african && overlay)
-                                bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*overlay));
-                            else
-                                bmp.add(overlay);
+                            bmp.add(overlay);
                         } else
                         {
                             auto* body =
-                              dynamic_cast<glArchivItem_Bitmap_Player*>(bob_carrier->getBody(fat, imgDir, ani_step));
-                            if(african && body)
-                                bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*body));
-                            else
-                                bmp.add(body);
+                              dynamic_cast<glArchivItem_Bitmap_Player*>(carrierBob->getBody(fat, imgDir, ani_step));
+                            bmp.add(body);
                             auto* overlay =
-                              dynamic_cast<glArchivItem_Bitmap_Player*>(bob_carrier->getOverlay(id, fat, imgDir, ani_step));
-                            if(african && overlay)
-                                bmp.add(carrierSkinRecolor::createAfricanCarrierSkin(*overlay));
-                            else
-                                bmp.add(overlay);
+                              dynamic_cast<glArchivItem_Bitmap_Player*>(carrierBob->getOverlay(id, fat, imgDir, ani_step));
+                            bmp.add(overlay);
                         }
                         bmp.addShadow(GetMapImage(900 + static_cast<unsigned>(imgDir) * 8 + ani_step));
                     };
