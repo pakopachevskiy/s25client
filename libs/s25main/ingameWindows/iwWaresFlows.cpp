@@ -11,8 +11,8 @@
 #include "WareProductionStatsHolder.h"
 #include "addons/const_addons.h"
 #include "controls/ctrlButton.h"
-#include "controls/ctrlMultiline.h"
 #include "controls/ctrlOptionGroup.h"
+#include "controls/ctrlText.h"
 #include "gameData/ShieldConsts.h"
 #include "gameData/ToolConsts.h"
 #include "gameData/const_gui_ids.h"
@@ -24,20 +24,30 @@
 #include "s25util/colors.h"
 #include "world/GameWorldBase.h"
 #include "world/GameWorldViewer.h"
+#include <algorithm>
 #include <array>
 #include <limits>
-#include <sstream>
 #include <vector>
 
 namespace {
 enum
 {
     ID_PlayerGroup = 100,
-    ID_Text,
-    ID_WareGroup
+    ID_WareGroup,
+    ID_WindowValue,
+    ID_ProducedValue,
+    ID_DemandValue,
+    ID_StockpileValue
 };
 
 constexpr unsigned ID_PlayerButtonBase = 1000;
+constexpr unsigned progressAreaX = 17;
+constexpr unsigned progressAreaY = 116;
+constexpr unsigned progressAreaWidth = 218;
+constexpr unsigned progressAreaHeight = 20;
+constexpr unsigned progressValueWidth = 44;
+constexpr unsigned wareButtonRow1Y = 162;
+constexpr unsigned wareButtonRow2Y = 197;
 
 std::string GetPlayerStatus(const GamePlayer& player)
 {
@@ -135,20 +145,15 @@ bool IsDemandCalculated(const WareDemandSnapshot& demand, const std::vector<Good
     return false;
 }
 
-std::string TrimPlayerName(const std::string& name)
-{
-    constexpr size_t maxPlayerNameLength = 16;
-    if(name.size() <= maxPlayerNameLength)
-        return name;
-    return name.substr(0, maxPlayerNameLength);
-}
 } // namespace
 
 iwWaresFlows::iwWaresFlows(const GameWorldViewer& gwv)
-    : IngameWindow(CGI_WARES_FLOWS, IngameWindow::posLastOrCenter, Extent(252, 304), _("Wares Flows"),
+    : IngameWindow(CGI_WARES_FLOWS, IngameWindow::posLastOrCenter, Extent(252, 248), _("Wares Flows"),
                    LOADER.GetImageN("resource", 41)),
-      gwv(gwv), text(nullptr), selectedPlayerId(gwv.GetPlayerId()), selectedWareId(categories.front().id),
-      currentWindowIndex(std::numeric_limits<unsigned>::max()), numPlayingPlayers(0)
+      gwv(gwv), windowValue(nullptr), producedValue(nullptr), demandValue(nullptr), stockpileValue(nullptr),
+      selectedPlayerId(gwv.GetPlayerId()), selectedWareId(categories.front().id),
+      currentWindowIndex(std::numeric_limits<unsigned>::max()), numPlayingPlayers(0), progressFillPercent(0),
+      progressPercentageText("---")
 {
     const GameWorldBase& world = gwv.GetWorld();
 
@@ -198,38 +203,50 @@ iwWaresFlows::iwWaresFlows(const GameWorldViewer& gwv)
     }
     players->SetSelection(ID_PlayerButtonBase + selectedPlayerId);
 
-    text = AddMultiline(ID_Text, DrawPoint(17, 88), Extent(218, 122), TextureColor::Grey, NormalFont);
-    text->SetScrollBarAllowed(false);
+    windowValue = AddText(ID_WindowValue, DrawPoint(GetSize().x / 2, progressAreaY), "", COLOR_YELLOW,
+                          FontStyle::CENTER | FontStyle::BOTTOM, SmallFont);
+    windowValue->setMaxWidth(progressAreaWidth);
+    producedValue = AddText(ID_ProducedValue, DrawPoint(progressAreaX + progressValueWidth / 2,
+                                                        progressAreaY + progressAreaHeight / 2),
+                            "0", COLOR_YELLOW, FontStyle::CENTER | FontStyle::VCENTER, SmallFont);
+    demandValue =
+      AddText(ID_DemandValue, DrawPoint(progressAreaX + progressAreaWidth - progressValueWidth / 2,
+                                        progressAreaY + progressAreaHeight / 2),
+              "0", COLOR_YELLOW, FontStyle::CENTER | FontStyle::VCENTER, SmallFont);
+    stockpileValue =
+      AddText(ID_StockpileValue, DrawPoint(GetSize().x / 2, progressAreaY + progressAreaHeight + 4), "",
+              COLOR_YELLOW, FontStyle::CENTER | FontStyle::TOP, SmallFont);
+    stockpileValue->setMaxWidth(progressAreaWidth);
 
     ctrlOptionGroup* types = AddOptionGroup(ID_WareGroup, GroupSelectType::Illuminate);
-    types->AddImageButton(1, DrawPoint(17, 218), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Wood),
-                          _("Wood"));
-    types->AddImageButton(2, DrawPoint(48, 218), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(1, DrawPoint(17, wareButtonRow1Y), Extent(30, 30), TextureColor::Grey,
+                          LOADER.GetWareTex(GoodType::Wood), _("Wood"));
+    types->AddImageButton(2, DrawPoint(48, wareButtonRow1Y), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Boards), _("Boards"));
-    types->AddImageButton(3, DrawPoint(79, 218), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(3, DrawPoint(79, wareButtonRow1Y), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Stones), _("Stones"));
-    types->AddImageButton(4, DrawPoint(110, 218), Extent(30, 30), TextureColor::Grey, LOADER.GetImageN("io", 80),
-                          _("Food"));
-    types->AddImageButton(5, DrawPoint(141, 218), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(4, DrawPoint(110, wareButtonRow1Y), Extent(30, 30), TextureColor::Grey,
+                          LOADER.GetImageN("io", 80), _("Food"));
+    types->AddImageButton(5, DrawPoint(141, wareButtonRow1Y), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Water), _("Water"));
-    types->AddImageButton(6, DrawPoint(172, 218), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Beer),
-                          _("Beer"));
-    types->AddImageButton(7, DrawPoint(203, 218), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Coal),
-                          _("Coal"));
+    types->AddImageButton(6, DrawPoint(172, wareButtonRow1Y), Extent(30, 30), TextureColor::Grey,
+                          LOADER.GetWareTex(GoodType::Beer), _("Beer"));
+    types->AddImageButton(7, DrawPoint(203, wareButtonRow1Y), Extent(30, 30), TextureColor::Grey,
+                          LOADER.GetWareTex(GoodType::Coal), _("Coal"));
 
-    types->AddImageButton(8, DrawPoint(17, 253), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(8, DrawPoint(17, wareButtonRow2Y), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::IronOre), _("Ironore"));
-    types->AddImageButton(9, DrawPoint(48, 253), Extent(30, 30), TextureColor::Grey, LOADER.GetWareTex(GoodType::Gold),
-                          _("Gold"));
-    types->AddImageButton(10, DrawPoint(79, 253), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(9, DrawPoint(48, wareButtonRow2Y), Extent(30, 30), TextureColor::Grey,
+                          LOADER.GetWareTex(GoodType::Gold), _("Gold"));
+    types->AddImageButton(10, DrawPoint(79, wareButtonRow2Y), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Iron), _("Iron"));
-    types->AddImageButton(11, DrawPoint(110, 253), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(11, DrawPoint(110, wareButtonRow2Y), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Coins), _("Coins"));
-    types->AddImageButton(12, DrawPoint(141, 253), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(12, DrawPoint(141, wareButtonRow2Y), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Hammer), _("Tools"));
-    types->AddImageButton(13, DrawPoint(172, 253), Extent(30, 30), TextureColor::Grey, LOADER.GetImageN("io", 111),
-                          _("Weapons"));
-    types->AddImageButton(14, DrawPoint(203, 253), Extent(30, 30), TextureColor::Grey,
+    types->AddImageButton(13, DrawPoint(172, wareButtonRow2Y), Extent(30, 30), TextureColor::Grey,
+                          LOADER.GetImageN("io", 111), _("Weapons"));
+    types->AddImageButton(14, DrawPoint(203, wareButtonRow2Y), Extent(30, 30), TextureColor::Grey,
                           LOADER.GetWareTex(GoodType::Boat), _("Boats"));
     types->SetSelection(selectedWareId);
 
@@ -244,6 +261,7 @@ void iwWaresFlows::Draw_()
         return;
 
     DrawPlayerSelection();
+    DrawDemandProgress();
 }
 
 void iwWaresFlows::Msg_OptionGroupChange(const unsigned ctrl_id, const unsigned selection)
@@ -293,6 +311,31 @@ void iwWaresFlows::DrawPlayerSelection()
     }
 }
 
+void iwWaresFlows::DrawDemandProgress()
+{
+    const DrawPoint barPos = GetDrawPos() + DrawPoint(progressAreaX + progressValueWidth, progressAreaY);
+    const Extent barSize(progressAreaWidth - 2 * progressValueWidth, progressAreaHeight);
+    Draw3D(Rect(barPos, barSize), TextureColor::Grey, false);
+
+    const DrawPoint innerPadding(4, 4);
+    const Extent innerSize(barSize.x - 2 * innerPadding.x, barSize.y - 2 * innerPadding.y);
+    const unsigned progressWidth = innerSize.x * progressFillPercent / 100;
+
+    unsigned color = 0xFFD70000;
+    if(progressFillPercent >= 60)
+        color = 0xFF71B63C;
+    else if(progressFillPercent >= 30)
+        color = 0xFFFFBF33;
+    else if(progressFillPercent >= 20)
+        color = 0xFFDB7428;
+
+    if(progressWidth > 0)
+        DrawRectangle(Rect(barPos + innerPadding, progressWidth, innerSize.y), color);
+
+    SmallFont->Draw(barPos + DrawPoint(barSize) / 2, progressPercentageText, FontStyle::CENTER | FontStyle::VCENTER,
+                    COLOR_YELLOW);
+}
+
 void iwWaresFlows::UpdateText()
 {
     const unsigned currentGf = gwv.GetWorld().GetEvMgr().GetCurrentGF();
@@ -305,33 +348,33 @@ void iwWaresFlows::UpdateText()
       WareDemandStatsHolder::GetCurrentDemand(gwv.GetWorld(), static_cast<unsigned char>(selectedPlayerId), currentGf,
                                               GAMECLIENT.GetAIPlayer(selectedPlayerId));
     const uint64_t produced = SumGoods(stats.produced, category.goods);
-    const uint64_t consumed = SumGoods(stats.consumed, category.goods);
     const uint64_t currentDemand = SumGoods(demand.demand, category.goods);
     const uint64_t stockpile =
       SumInventoryGoods(gwv.GetWorld().GetPlayer(selectedPlayerId).GetInventory(), category.goods);
     const bool demandCalculated = IsDemandCalculated(demand, category.goods);
-
-    std::stringstream ss;
-    ss << _("Player") << ": " << TrimPlayerName(gwv.GetWorld().GetPlayer(selectedPlayerId).name) << '\n';
     if(currentWindowIndex == 0)
-        ss << _("Window") << ": " << _("no completed 5000-gf window") << '\n';
+        windowValue->SetText(std::string(_("Window")) + ": ---");
     else
     {
         const unsigned windowStart = (currentWindowIndex - 1) * WareProductionStatsHolder::WINDOW_SIZE_GF;
         const unsigned windowEnd = currentWindowIndex * WareProductionStatsHolder::WINDOW_SIZE_GF - 1;
-        ss << _("Window") << ": " << windowStart << "-" << windowEnd << " gf\n";
+        windowValue->SetText(std::string(_("Window")) + ": " + std::to_string(windowStart) + "-"
+                             + std::to_string(windowEnd) + " gf");
     }
-    ss << _("Ware") << ": " << _(category.name) << '\n';
-    ss << _("Produced") << ": " << produced << '\n';
-    ss << _("Consumed") << ": " << consumed << '\n';
-    ss << _("Demand") << ": " << (demandCalculated ? std::to_string(currentDemand) : "-") << '\n';
-    ss << _("Stockpile") << ": " << stockpile;
 
-    const std::string content = ss.str();
-    if(content == currentText)
-        return;
+    producedValue->SetText(std::to_string(produced));
+    demandValue->SetText(demandCalculated ? std::to_string(currentDemand) : "-");
+    stockpileValue->SetText(std::string(_("Stockpile")) + ": " + std::to_string(stockpile));
 
-    currentText = content;
-    text->Clear();
-    text->AddString(currentText, COLOR_YELLOW, false);
+    if(!demandCalculated || currentDemand == 0)
+        progressPercentageText = "---";
+    else
+        progressPercentageText = std::to_string(produced * 100 / currentDemand) + "%";
+
+    if(!demandCalculated)
+        progressFillPercent = 0;
+    else if(currentDemand == 0)
+        progressFillPercent = produced > 0 ? 100 : 0;
+    else
+        progressFillPercent = static_cast<unsigned>(std::min<uint64_t>(produced * 100 / currentDemand, 100));
 }

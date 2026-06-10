@@ -9,7 +9,7 @@
 #include <array>
 #include <string>
 
-class ctrlMultiline;
+class ctrlText;
 class GameWorldViewer;
 
 class iwWaresFlows : public IngameWindow
@@ -20,16 +20,21 @@ public:
 private:
     const GameWorldViewer& gwv;
     std::array<bool, MAX_PLAYERS> activePlayers{};
-    ctrlMultiline* text;
+    ctrlText* windowValue;
+    ctrlText* producedValue;
+    ctrlText* demandValue;
+    ctrlText* stockpileValue;
     unsigned selectedPlayerId;
     unsigned selectedWareId;
     unsigned currentWindowIndex;
     unsigned numPlayingPlayers;
-    std::string currentText;
+    unsigned progressFillPercent;
+    std::string progressPercentageText;
 
     void Draw_() override;
     void Msg_OptionGroupChange(unsigned ctrl_id, unsigned selection) override;
     void Msg_PaintBefore() override;
     void DrawPlayerSelection();
+    void DrawDemandProgress();
     void UpdateText();
 };

@@ -8,6 +8,7 @@
 #include "WareProductionStatsHolder.h"
 #include "buildings/noBuildingSite.h"
 #include "buildings/nobUsual.h"
+#include "addons/const_addons.h"
 #include "factories/BuildingFactory.h"
 #include "gameData/BuildingConsts.h"
 #include "gameData/JobConsts.h"
@@ -129,6 +130,41 @@ BOOST_AUTO_TEST_CASE(MineFoodDemandIsSplitAcrossAcceptedFoodWares)
     BOOST_TEST(demand.demand[GoodType::Fish] + demand.demand[GoodType::Meat] + demand.demand[GoodType::Bread]
                == expectedFoodDemand);
     BOOST_TEST(expectedFoodDemand == 5u);
+}
+
+BOOST_AUTO_TEST_CASE(MintDemandCountsGoldAndCoalInputs)
+{
+    CreateStaffedBuilding(*this, BuildingType::Mint);
+
+    const WareDemandSnapshot& demand = WareDemandStatsHolder::GetCurrentDemand(world, 0, 0, nullptr);
+    const unsigned expectedMintDemand = CyclesPerWindow(BuildingType::Mint);
+    BOOST_TEST(demand.calculated[GoodType::Gold]);
+    BOOST_TEST(demand.calculated[GoodType::Coal]);
+    BOOST_TEST(demand.demand[GoodType::Gold] == expectedMintDemand);
+    BOOST_TEST(demand.demand[GoodType::Coal] == expectedMintDemand);
+}
+
+BOOST_AUTO_TEST_CASE(ArmoryDemandCountsIronAndCoalInputs)
+{
+    CreateStaffedBuilding(*this, BuildingType::Armory);
+
+    const WareDemandSnapshot& demand = WareDemandStatsHolder::GetCurrentDemand(world, 0, 0, nullptr);
+    const unsigned expectedArmoryDemand = CyclesPerWindow(BuildingType::Armory);
+    BOOST_TEST(demand.calculated[GoodType::Iron]);
+    BOOST_TEST(demand.calculated[GoodType::Coal]);
+    BOOST_TEST(demand.demand[GoodType::Iron] == expectedArmoryDemand);
+    BOOST_TEST(demand.demand[GoodType::Coal] == expectedArmoryDemand);
+}
+
+BOOST_AUTO_TEST_CASE(ArmoryDemandHonorsHalfCostMilitaryEquipment)
+{
+    ggs.setSelection(AddonId::HALF_COST_MIL_EQUIP, 1);
+    CreateStaffedBuilding(*this, BuildingType::Armory);
+
+    const WareDemandSnapshot& demand = WareDemandStatsHolder::GetCurrentDemand(world, 0, 0, nullptr);
+    const unsigned expectedArmoryDemand = (CyclesPerWindow(BuildingType::Armory) + 1u) / 2u;
+    BOOST_TEST(demand.demand[GoodType::Iron] == expectedArmoryDemand);
+    BOOST_TEST(demand.demand[GoodType::Coal] == expectedArmoryDemand);
 }
 
 BOOST_AUTO_TEST_CASE(ConstructionDemandSumsFullCostsOfCurrentBuildingSites)

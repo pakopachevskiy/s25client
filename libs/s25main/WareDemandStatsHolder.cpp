@@ -6,7 +6,9 @@
 
 #include "BuildingRegister.h"
 #include "GamePlayer.h"
+#include "GlobalGameSettings.h"
 #include "WareProductionStatsHolder.h"
+#include "addons/const_addons.h"
 #include "buildings/noBuildingSite.h"
 #include "buildings/nobUsual.h"
 #include "gameData/BuildingConsts.h"
@@ -37,9 +39,7 @@ bool IsSkippedRecurringBuilding(const BuildingType type)
     {
         case BuildingType::Temple:
         case BuildingType::Catapult:
-        case BuildingType::Brewery:
-        case BuildingType::Armory:
-        case BuildingType::Mint: return true;
+        case BuildingType::Brewery: return true;
         default: return false;
     }
 }
@@ -76,6 +76,14 @@ unsigned GetBuildingCycleGf(const BuildingType type)
     return jobConst.wait1_length + jobConst.work_length + jobConst.wait2_length + 40u;
 }
 
+unsigned GetDemandCyclesPerWindow(const GlobalGameSettings& ggs, const BuildingType type, const unsigned cycleGf)
+{
+    const unsigned cyclesPerWindow = CeilDiv(WareProductionStatsHolder::WINDOW_SIZE_GF, cycleGf);
+    if(type == BuildingType::Armory && ggs.isEnabled(AddonId::HALF_COST_MIL_EQUIP))
+        return CeilDiv(cyclesPerWindow, 2u);
+    return cyclesPerWindow;
+}
+
 void MarkSupportedRecurringDemand(WareDemandSnapshot& snapshot)
 {
     for(const BuildingType type : helpers::EnumRange<BuildingType>{})
@@ -89,7 +97,7 @@ void MarkSupportedRecurringDemand(WareDemandSnapshot& snapshot)
     }
 }
 
-void AddRecurringDemand(WareDemandSnapshot& snapshot, const GamePlayer& player)
+void AddRecurringDemand(WareDemandSnapshot& snapshot, const GameWorldBase& world, const GamePlayer& player)
 {
     const BuildingRegister& buildingRegister = player.GetBuildingRegister();
     for(const BuildingType type : helpers::EnumRange<BuildingType>{})
@@ -105,7 +113,7 @@ void AddRecurringDemand(WareDemandSnapshot& snapshot, const GamePlayer& player)
         if(cycleGf == 0u)
             continue;
 
-        const unsigned cyclesPerWindow = CeilDiv(WareProductionStatsHolder::WINDOW_SIZE_GF, cycleGf);
+        const unsigned cyclesPerWindow = GetDemandCyclesPerWindow(world.GetGGS(), type, cycleGf);
         for(const nobUsual* building : buildingRegister.GetBuildings(type))
         {
             if(!building->HasWorker() || building->IsProductionDisabled())
@@ -152,7 +160,7 @@ WareDemandSnapshot CalculateDemand(const GameWorldBase& world, const unsigned ch
 
     const GamePlayer& player = world.GetPlayer(playerId);
     MarkSupportedRecurringDemand(snapshot);
-    AddRecurringDemand(snapshot, player);
+    AddRecurringDemand(snapshot, world, player);
     AddConstructionDemand(snapshot, player);
     return snapshot;
 }
