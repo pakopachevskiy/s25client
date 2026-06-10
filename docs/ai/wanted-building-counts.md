@@ -36,6 +36,11 @@ buildingsWanted[type] - GetNumBuildings(type)
 execution wave. A non-military build job is allowed only while current orders
 are below the missing count.
 
+Before the demand-specific checks, `Wanted(type)` also applies
+`wantedParams[type].maxSites`. A value of `0` means unlimited; any non-zero
+value blocks more construction while active building sites of that type are at
+or above the configured cap.
+
 Military buildings and most `Storehouse` requests do not use this per-type
 missing-count check. `Storehouse` is always wanted while `GetStorehouses()`
 contains no warehouse beyond headquarters and there is no active storehouse

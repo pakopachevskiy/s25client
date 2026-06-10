@@ -28,7 +28,8 @@ Behaviour driven by these knobs is documented in:
   planner uses to decide whether another building of a given type is needed.
   `priorityInc` controls how quickly queued global build jobs of that type gain
   priority each construction cycle; the default is `1`, except `Storehouse`
-  defaults to `3`.
+  defaults to `3`. `maxSites` caps active building sites of that type when
+  non-zero; the default `0` means no per-type site cap.
 - `locationParams[BuildingType]` – Position-finding weights that rate how
   attractive a potential site is (terrain access, distance modifiers, etc.).
   Includes `resources` thresholds for minimal required AI resource values per

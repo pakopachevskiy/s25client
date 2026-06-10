@@ -845,6 +845,9 @@ bool AIConstruction::Wanted(BuildingType type) const
         return false;
     if(type == BuildingType::Catapult && !aii.CanBuildCatapult())
         return false;
+    const unsigned maxSites = aijh.GetConfig().wantedParams[type].maxSites;
+    if(maxSites > 0 && bldPlanner.GetNumBuildingSites(type) >= maxSites)
+        return false;
     if(type == BuildingType::Storehouse)
     {
         const auto hasWarehouseBeyondHeadquarters = [](const nobBaseWarehouse* warehouse) {

@@ -68,6 +68,7 @@ struct WantedParams
     helpers::EnumArray<BuildParams, AIResource> resourceWeights = helpers::EnumArray<BuildParams, AIResource>{};
     BuildParams workersAdvance = {1};
     unsigned max = 10000;
+    unsigned maxSites = 0;
     unsigned priorityInc = 1;
     unsigned minProductivity = 0;
     BuildParams productivity = {};

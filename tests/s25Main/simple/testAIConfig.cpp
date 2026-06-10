@@ -29,6 +29,7 @@ BOOST_AUTO_TEST_CASE(WantedParams_PriorityIncDefaultsToOne)
     BOOST_TEST(config.wantedParams[BuildingType::Sawmill].priorityInc == 1u);
     BOOST_TEST(config.wantedParams[BuildingType::Quarry].priorityInc == 1u);
     BOOST_TEST(config.wantedParams[BuildingType::Storehouse].priorityInc == 3u);
+    BOOST_TEST(config.wantedParams[BuildingType::Sawmill].maxSites == 0u);
 }
 
 BOOST_AUTO_TEST_CASE(SmartForest_DefaultsAreEnabled)
@@ -172,6 +173,24 @@ BOOST_AUTO_TEST_CASE(WantedParams_PriorityIncCanBeParsed)
     BOOST_TEST(config.wantedParams[BuildingType::Sawmill].priorityInc == 5u);
     BOOST_TEST(config.wantedParams[BuildingType::Quarry].priorityInc == 1u);
     BOOST_TEST(config.wantedParams[BuildingType::Storehouse].priorityInc == 3u);
+}
+
+BOOST_AUTO_TEST_CASE(WantedParams_MaxSitesCanBeParsed)
+{
+    const std::string configPath = "/tmp/rttr-ai-max-sites.yaml";
+    {
+        std::ofstream out(configPath);
+        BOOST_TEST_REQUIRE(out.good());
+        out << "buildPlanner:\n";
+        out << "  Sawmill:\n";
+        out << "    maxSites: 2\n";
+    }
+
+    AIConfig config;
+    applyWeightsCfg(configPath, config);
+
+    BOOST_TEST(config.wantedParams[BuildingType::Sawmill].maxSites == 2u);
+    BOOST_TEST(config.wantedParams[BuildingType::Quarry].maxSites == 0u);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
