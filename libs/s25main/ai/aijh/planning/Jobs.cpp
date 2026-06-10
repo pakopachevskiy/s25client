@@ -10,7 +10,6 @@
 #include "ai/aijh/debug/AIRuntimeProfiler.h"
 #include "ai/aijh/planning/AIConstruction.h"
 #include "ai/aijh/planning/BuildingPlanner.h"
-#include "ai/aijh/planning/PositionSearch.h"
 #include "ai/aijh/runtime/AIPlanningContext.h"
 #include "buildings/noBuildingSite.h"
 #include "GamePlayer.h"
@@ -522,27 +521,6 @@ void ConnectJob::ExecuteJob()
         aijh.RecalcGround(flagPos, route);
         state = JobState::Finished;
     }
-}
-
-void SearchJob::ExecuteJob()
-{
-    state = JobState::Failed;
-    PositionSearchState searchState = search->execute(aijh);
-
-    if(searchState == PositionSearchState::InProgress)
-        state = JobState::Waiting;
-    else if(searchState == PositionSearchState::Failed)
-        state = JobState::Failed;
-    else
-    {
-        state = JobState::Finished;
-        aijh.AddBuildJob(search->GetBld(), search->GetResultPt(), true, false);
-    }
-}
-
-SearchJob::~SearchJob()
-{
-    delete search;
 }
 
 } // namespace AIJH

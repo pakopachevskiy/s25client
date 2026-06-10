@@ -13,7 +13,7 @@ For the JH AI directory split and file-placement rules, see
 - Runtime stimuli are buffered in `AIEventManager`/`AIEvents` (`libs/s25main/ai/AIEventManager.*`, `AIEvents.h`). Events such as `BuildingDestroyed` or `RoadConstructionFailed` are wrapped in lightweight structs and processed by job handlers inside `AIPlayerJH`.
 
 ## Planning Components
-- `AIConstruction` (`libs/s25main/ai/aijh/planning/AIConstruction.*`) holds build and connection queues (`BuildJob`, `ConnectJob`, `EventJob`, `SearchJob` from `Jobs.*`), schedules execution, and deals with road layout and duplicate suppression.  
+- `AIConstruction` (`libs/s25main/ai/aijh/planning/AIConstruction.*`) holds build and connection queues (`BuildJob`, `ConnectJob`, `EventJob` from `Jobs.*`), schedules execution, and deals with road layout and duplicate suppression.
 - `BuildingPlanner` tracks stockpiles, active constructions, and desired building counts. It feeds `AIConstruction` with priorities and expansion hints.  
 - `AIMap` and `Node` (`libs/s25main/ai/aijh/runtime/AIMap.h`) cache per-hex metadata such as ownership, building quality, failed placements, and reachability to limit expensive world lookups.
 

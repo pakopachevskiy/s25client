@@ -45,7 +45,6 @@ class AIJob;
 class BuildJob;
 class ConnectJob;
 class EventJob;
-class SearchJob;
 class AIMapState;
 class AIEconomyController;
 class AIEventHandler;

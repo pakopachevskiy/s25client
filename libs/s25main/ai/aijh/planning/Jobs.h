@@ -20,7 +20,6 @@ class Base;
 namespace AIJH {
 
 class AIPlanningContext;
-class PositionSearch;
 
 enum class JobState
 {
@@ -142,17 +141,6 @@ public:
 
 private:
     std::unique_ptr<AIEvent::Base> ev;
-};
-
-class SearchJob : public AIJob
-{
-public:
-    SearchJob(AIPlanningContext& aijh, PositionSearch* search) : AIJob(aijh), search(search) {}
-    ~SearchJob() override;
-    void ExecuteJob() override;
-
-private:
-    PositionSearch* search;
 };
 
 } // namespace AIJH

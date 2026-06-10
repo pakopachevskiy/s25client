@@ -12,7 +12,7 @@ historical file growth.
 - `planning/`
   - build planning, position search, and job execution
   - examples: `AIConstruction`, `BuildingPlanner`, `BuildingCalculator`,
-    `GlobalPositionFinder`, `Jobs`, `PositionSearch`
+    `GlobalPositionFinder`, `Jobs`
 - `combat/`
   - combat orchestration and target-selection strategies
   - examples: `AICombatController`, `TargetSelector*`
